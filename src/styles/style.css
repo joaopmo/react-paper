@@ -1,0 +1,43 @@
+.pb-page {
+    background-color: white;
+    box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+    transform-origin: top left;
+    overflow: hidden;
+}
+
+.pb-dimension {
+    flex: 1;
+    border: 1px solide aqua;
+}
+
+@media print {
+    .pb-container > div {
+        visibility: visible;
+        display: block;
+        box-shadow: none;
+        border: none;
+        outline: none;
+        position: absolute;
+        margin: 0;
+        padding: 0;
+        top: 0;
+        left: 0;
+
+    }
+
+    .pb-page {
+        visibility: visible;
+        display: block;
+        break-inside: avoid;
+        page-break-after: always;
+        box-shadow: none;
+        border: none;
+        outline: none;
+        transform: none;
+        margin: 0;
+        padding: 0;
+        height: min(297mm, 100vh);
+        width: min(210mm, 100vw);
+
+    }
+}
