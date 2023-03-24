@@ -5,7 +5,7 @@ export type StructureObject = ColumnObject[];
 type StructureObjectPartial = ColumnObjectPartial[];
 
 export function fieldNormalizer(field: FieldObjectPartial): FieldObject {
-  const { element, render, children } = field;
+  const { element, render, content, children } = field;
   let normalized: FieldObject['children'] = null;
 
   if (children) {
@@ -18,6 +18,7 @@ export function fieldNormalizer(field: FieldObjectPartial): FieldObject {
   return {
     element: element || null,
     render: render || null,
+    content: content || 'text',
     children: normalized,
   };
 }

@@ -7,6 +7,7 @@ export type Subscribe = (ref: Element, path: Path) => () => void;
 
 interface BaseField<T> {
   children: T[] | null;
+  content: 'block' | 'text';
 }
 
 interface ElementField<T> extends BaseField<T> {
@@ -56,6 +57,7 @@ export function structureFromChildren(children: React.ReactNode): FieldObject[] 
     const field: FieldObject = {
       element: child.props.element || null,
       render: child.props.render || null,
+      content: child.props.content || null,
       children: null,
     };
 

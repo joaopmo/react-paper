@@ -1,43 +1,90 @@
+.pb-dimension {
+    display: flex;
+    justify-content: center;
+}
+
+.pb-container {
+    display: flex;
+    flex-direction: column;
+    row-gap: 10px;
+}
+
 .pb-page {
+    display: flex;
+    justify-content: space-around;
+    line-height: 1.2;
     background-color: white;
     box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.15);
     transform-origin: top left;
+}
+
+
+.pb-page * {
+    line-height:inherit;
     overflow: hidden;
 }
 
-.pb-dimension {
+.pb-column {
+    background-color: aqua;
     flex: 1;
-    border: 1px solide aqua;
 }
 
+@page {
+    size: A4 portrait;
+    margin: 0;
+    padding: 0;
+  }
+
 @media print {
-    .pb-container > div {
+    html,
+    body,
+    body * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        visibility: hidden;
+    }
+
+    .pb-container, .pb-container * {
         visibility: visible;
+    }
+   
+
+    .pb-container { 
         display: block;
-        box-shadow: none;
-        border: none;
-        outline: none;
         position: absolute;
-        margin: 0;
-        padding: 0;
         top: 0;
         left: 0;
-
+        margin: 0;
+        padding: 0;
+        border: none;
+        outline: none;
     }
 
     .pb-page {
-        visibility: visible;
-        display: block;
         break-inside: avoid;
         page-break-after: always;
         box-shadow: none;
-        border: none;
-        outline: none;
-        transform: none;
-        margin: 0;
-        padding: 0;
-        height: min(297mm, 100vh);
-        width: min(210mm, 100vw);
-
     }
 }
+
+* {
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+    font-family: Roboto;
+  }
+
+h1, h2 {
+    font-size: 64px;
+    line-height: 64px;
+    vertical-align: middle;
+    
+  }
+  
+  h1 {
+    background: tomato;
+  }
+  
+  h2 {
+    background: mediumaquamarine;
+  }

@@ -52,8 +52,8 @@ export function PageBreaker({ children, structure }: PageBreakerProps): JSX.Elem
   }, [children]);
 
   return (
-    <DimensionProvider widthFrac={0.5} multiplier={3.78}>
-      <Paginator structure={structure || (structFromChildren as StructureObject)} />;
+    <DimensionProvider widthFrac={0.8} multiplier={3.78}>
+      <Paginator structure={structure || (structFromChildren as StructureObject)} />
     </DimensionProvider>
   );
 }

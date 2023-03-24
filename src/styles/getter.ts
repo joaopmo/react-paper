@@ -1,8 +1,9 @@
 import { Path } from '../components/Field';
 
 export interface ElStyle<T> {
-  marginBox: T;
+  // marginBox: T;
   contentBox: T;
+  borderBox: T;
   fontSize: T;
   lineHeight: T;
   marginTop: T;
@@ -21,7 +22,8 @@ export const getStyle = (el: Element): ElStyle<number> => {
   const style = window.getComputedStyle(el);
 
   const properties: ElStyle<string> = {
-    marginBox: 'height',
+    // marginBox: 'height',
+    borderBox: 'height',
     contentBox: 'height',
     fontSize: 'font-size',
     lineHeight: 'line-height',
@@ -39,13 +41,16 @@ export const getStyle = (el: Element): ElStyle<number> => {
   }, {} as ElStyle<number>);
 
   if (style.getPropertyValue('box-sizing') === 'border-box') {
-    sizes.marginBox += sizes.marginTop + sizes.marginBottom;
+    // sizes.marginBox += sizes.marginTop + sizes.marginBottom;
     sizes.contentBox -= sizes.paddingTop + sizes.paddingBottom;
     sizes.contentBox -= sizes.borderTop + sizes.borderBottom;
   } else {
-    sizes.marginBox += sizes.paddingTop + sizes.paddingBottom;
-    sizes.marginBox += sizes.borderTop + sizes.borderBottom;
-    sizes.marginBox += sizes.marginTop + sizes.marginBottom;
+    // sizes.marginBox += sizes.paddingTop + sizes.paddingBottom;
+    // sizes.marginBox += sizes.borderTop + sizes.borderBottom;
+    // sizes.marginBox += sizes.marginTop + sizes.marginBottom;
+
+    sizes.borderBox += sizes.paddingTop + sizes.paddingBottom;
+    sizes.borderBox += sizes.borderTop + sizes.borderBottom;
   }
 
   return sizes;

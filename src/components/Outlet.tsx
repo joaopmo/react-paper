@@ -26,9 +26,15 @@ interface OutletProviderProps {
   path: Path;
   outlet: JSX.Element | null;
   children: React.ReactNode | null;
+  subscribe: boolean;
 }
 
-export function OutletProvider({ path, outlet, children }: OutletProviderProps): JSX.Element {
+export function OutletProvider({
+  path,
+  outlet,
+  children,
+  subscribe,
+}: OutletProviderProps): JSX.Element {
   const [ref, setRef] = React.useState<Element | null>(null);
 
   const { subField } = useField();
@@ -39,7 +45,9 @@ export function OutletProvider({ path, outlet, children }: OutletProviderProps):
 
   const reference = React.useCallback(
     (el: Element | null) => {
-      if (el && el !== ref) setRef(el);
+      if (el && el !== ref && subscribe) {
+        setRef(el);
+      }
     },
     [ref],
   );
@@ -49,19 +57,19 @@ export function OutletProvider({ path, outlet, children }: OutletProviderProps):
   );
 }
 
-export function renderWithOutlet(structure: FieldObject, path: Path = []): JSX.Element {
+export function renderWithOutlet(structure: FieldObject, path: Path = [], sub = true): JSX.Element {
   const { element, children } = structure;
   const outlets: React.ReactNode[] = [];
   if (children) {
     children.forEach((child, index) => {
-      outlets.push(renderWithOutlet(child, [...path, index]));
+      outlets.push(renderWithOutlet(child, [...path, index], sub));
     });
   }
 
   const outlet = <>{outlets}</>;
 
   return (
-    <OutletProvider path={path} outlet={outlet} key={path.join('.')}>
+    <OutletProvider path={path} outlet={outlet} subscribe={sub} key={path.join('.')}>
       {element}
     </OutletProvider>
   );
