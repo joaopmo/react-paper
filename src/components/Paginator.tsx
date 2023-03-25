@@ -1,12 +1,12 @@
 import React from 'react';
 import { FieldObject, Path, Subscribe } from './Field';
-import { renderWithOutlet } from './Outlet';
 import { useDimension } from './Dimension';
 import { Page } from './Page';
 import { StructureObject } from '../utils/transforms';
 import { ElStyle, getStyle } from '../styles/getter';
 import debounce from '../utils/debounce';
 import { get, zip } from '../utils/accessors';
+import Big from 'big.js';
 
 interface FieldContextObject {
   subField: Subscribe | null;
@@ -16,9 +16,9 @@ interface Slice {
   path: Path;
   current: number; // index of the slice taking into account all slices with same path
   leadPage: number; // starting page
-  upperBound: number; // starting lenght
-  lowerBound: number; // ending length head tail
-  addedHeight: number; // Cumulative height of slices in the page
+  upperBound: Big; // starting lenght
+  lowerBound: Big; // ending length head tail
+  addedHeight: Big; // Cumulative height of slices in the page
 }
 
 export type PageDescriptor = Slice[];
@@ -51,7 +51,7 @@ export function Paginator({ structure }: PaginatorProps) {
   const ROOT_FIELD = 1;
   const elementToPath = React.useRef<Map<Element, Path>>(new Map());
   const pathToElement = React.useRef<Map<string, Element>>(new Map());
-  const { height: pageHeight } = useDimension();
+  const { height: pageHeight, scale } = useDimension();
 
   const map = React.useMemo(() => {
     return {
@@ -74,6 +74,7 @@ export function Paginator({ structure }: PaginatorProps) {
     };
   }, []);
   const [schema, dispatch] = React.useReducer(reducer, [], init);
+  const [loading, setLoading] = React.useState(true);
 
   function init(schema: Schema): Schema {
     schema = structure.map((column, columnIndex) => {
@@ -82,9 +83,9 @@ export function Paginator({ structure }: PaginatorProps) {
           path: [columnIndex, fieldIndex],
           current: 0,
           leadPage: 0,
-          upperBound: 0,
-          lowerBound: 0,
-          addedHeight: 0,
+          upperBound: Big(0),
+          lowerBound: Big(0),
+          addedHeight: Big(0),
         };
       });
       return [page];
@@ -141,12 +142,12 @@ export function Paginator({ structure }: PaginatorProps) {
       prevPath: Path;
       leadPage: number;
       currSlice: number;
-      upperBound: number;
-      lowerBound: number;
-      addedHeight: number;
-      freeHeight: number;
+      upperBound: Big;
+      lowerBound: Big;
+      addedHeight: Big;
+      freeHeight: Big;
       field: FieldObject;
-      style: ElStyle<number>;
+      style: ElStyle<Big>;
       prevSibEl?: Element;
       nextSibEl?: Element;
     };
@@ -158,18 +159,23 @@ export function Paginator({ structure }: PaginatorProps) {
       styleProp: keyof ElStyle<number>,
     ) {
       let currentBox = state.style[styleProp];
+      const tmp = state.style.lineHeight.minus(state.style.fontSize).toNumber();
+      // const safeMargin = new Big(Math.log10(tmp));
+      const safeMargin = new Big(0);
+      let countMargin = 0;
 
       // Logic to handle margin collapse between adjacent siblings.
       // Margin collapse between parent and descendants is handled
       // by .pb-page * { overflow: hidden; } css rule.
       // =================================================================
       if (styleProp === 'marginTop' && state.prevSibEl) {
-        currentBox = 0.0;
+        currentBox = Big(0);
       }
 
       if (styleProp === 'marginBottom' && state.nextSibEl) {
-        const { marginTop } = getStyle(state.nextSibEl);
-        currentBox = Math.max(marginTop, currentBox);
+        const { marginTop } = getStyle(state.nextSibEl, scale);
+        currentBox = marginTop.gt(currentBox) ? marginTop : currentBox;
+        // currentBox = Math.max(marginTop, currentBox);
       }
       // =================================================================
 
@@ -196,26 +202,73 @@ export function Paginator({ structure }: PaginatorProps) {
       //   }
       // }
 
-      while (true) {
-        if (state.freeHeight >= currentBox) {
-          state.lowerBound += currentBox;
-          state.addedHeight += currentBox;
-          state.freeHeight -= currentBox;
+      if (styleProp === 'contentBox' && state.field.content === 'text') {
+        while (true) {
+          if (countMargin === 0 && state.freeHeight.gte(currentBox)) {
+            state.lowerBound = state.lowerBound.plus(currentBox);
+            state.addedHeight = state.addedHeight.plus(currentBox);
+            state.freeHeight = state.freeHeight.minus(currentBox);
+            break;
+          }
 
-          break;
+          if (state.freeHeight.gte(currentBox.plus(safeMargin))) {
+            state.upperBound = state.upperBound.minus(safeMargin);
+            state.lowerBound = state.lowerBound.plus(currentBox);
+            state.addedHeight = state.addedHeight.plus(currentBox).plus(safeMargin);
+            state.freeHeight = state.freeHeight.minus(currentBox).minus(safeMargin);
+            break;
+          }
+
+          let up = new Big(0);
+          let lo = new Big(0);
+          if (countMargin === 0 && state.freeHeight.gte(state.style.lineHeight.plus(safeMargin))) {
+            state.freeHeight = state.freeHeight.minus(safeMargin);
+            const cap = state.freeHeight.minus(state.freeHeight.mod(state.style.lineHeight));
+            state.lowerBound = state.lowerBound.plus(cap);
+            lo = lo.plus(safeMargin);
+            state.addedHeight = state.addedHeight.plus(cap);
+            state.freeHeight = state.freeHeight.minus(cap);
+            currentBox = currentBox.minus(cap);
+            countMargin++;
+          }
+
+          if (state.freeHeight.gte(state.style.lineHeight.plus(safeMargin.times(2)))) {
+            state.freeHeight = state.freeHeight.minus(safeMargin.times(2));
+            const cap = state.freeHeight.minus(state.freeHeight.mod(state.style.lineHeight));
+            up = up.plus(safeMargin);
+            lo = lo.plus(safeMargin);
+            state.lowerBound = state.lowerBound.plus(cap);
+            state.addedHeight = state.addedHeight.plus(cap);
+            state.freeHeight = state.freeHeight.minus(cap);
+            currentBox = currentBox.minus(cap);
+            countMargin++;
+          }
+
+          page.push({
+            path: state.currPath.slice(0, 2),
+            current: state.currSlice++,
+            leadPage: state.leadPage,
+            addedHeight: state.addedHeight.plus(up).plus(lo),
+            upperBound: state.upperBound.minus(up),
+            lowerBound: state.lowerBound.plus(lo),
+          });
+
+          column.push([...page]);
+          page.length = 0;
+          state.addedHeight = Big(0);
+          state.freeHeight = Big(pageHeight);
+          state.upperBound = state.lowerBound;
         }
 
-        if (
-          styleProp === 'contentBox' &&
-          state.field.content === 'text' &&
-          state.freeHeight >= state.style.lineHeight
-        ) {
-          let contentCap = state.freeHeight;
-          contentCap -= state.freeHeight % state.style.lineHeight;
-          state.lowerBound += contentCap;
-          state.addedHeight += contentCap;
-          state.freeHeight -= contentCap;
-          currentBox -= contentCap;
+        return 0;
+      }
+
+      while (true) {
+        if (state.freeHeight.gte(currentBox)) {
+          state.lowerBound = state.lowerBound.plus(currentBox);
+          state.addedHeight = state.addedHeight.plus(currentBox);
+          state.freeHeight = state.freeHeight.minus(currentBox);
+          break;
         }
 
         if (styleProp === 'marginTop' && state.currPath.length === 2) {
@@ -233,10 +286,11 @@ export function Paginator({ structure }: PaginatorProps) {
 
         column.push([...page]);
         page.length = 0;
-        state.addedHeight = 0;
-        state.freeHeight = pageHeight;
+        state.addedHeight = Big(0);
+        state.freeHeight = Big(pageHeight);
         state.upperBound = state.lowerBound;
       }
+
       return 0;
     }
 
@@ -244,19 +298,19 @@ export function Paginator({ structure }: PaginatorProps) {
       const [leadPage, sliceIdx] = findSlice(path);
       const page: Slice[] = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
       const column: PageDescriptor[] = schema[path[COLUMN]].slice(0, leadPage);
-      const addedHeight = page.at(-1)?.addedHeight ?? 0;
-      const freeHeight = pageHeight - addedHeight;
+      const addedHeight = page.at(-1)?.addedHeight ?? Big(0);
+      const freeHeight = Big(pageHeight).minus(addedHeight);
 
       const state: State = {
         prevPath: [],
         currPath: path,
         leadPage,
         currSlice: 0,
-        upperBound: 0,
-        lowerBound: 0,
+        upperBound: Big(0),
+        lowerBound: Big(0),
         addedHeight,
         freeHeight,
-        style: getStyle(map.get(path) as Element),
+        style: getStyle(map.get(path) as Element, scale),
         field: get(structure, path) as FieldObject,
       };
 
@@ -268,7 +322,7 @@ export function Paginator({ structure }: PaginatorProps) {
       while (pathStack.length > 0) {
         state.currPath = pathStack.pop()!;
         const parent = state.currPath.slice(0, -1);
-        state.style = getStyle(map.get(state.currPath) as Element);
+        state.style = getStyle(map.get(state.currPath) as Element, scale);
 
         state.field = get(structure, state.currPath) as FieldObject;
         state.prevSibEl = map.get([...parent, state.currPath.at(-1)! - 1]) as Element;
@@ -354,7 +408,9 @@ export function Paginator({ structure }: PaginatorProps) {
         return acc;
       }, new Map<number, Path>());
 
+      setLoading(true);
       dispatch({ type: 'resize', payload: { leadChanges } });
+      setLoading(false);
     },
     [map],
   );
@@ -402,7 +458,15 @@ export function Paginator({ structure }: PaginatorProps) {
     <FieldContext.Provider value={{ subField }}>
       <div className="pb-container">
         {zip(schema).map((columns: Array<PageDescriptor | null>, index) => {
-          return <Page columns={columns} structure={structure} index={index} key={index} />;
+          return (
+            <Page
+              columns={columns}
+              structure={structure}
+              index={index}
+              loading={loading}
+              key={index}
+            />
+          );
         })}
       </div>
     </FieldContext.Provider>

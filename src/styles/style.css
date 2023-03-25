@@ -3,6 +3,10 @@
     justify-content: center;
 }
 
+.pb-container, .pb-container * {
+    box-sizing: border-box;
+}
+
 .pb-container {
     display: flex;
     flex-direction: column;
@@ -12,7 +16,8 @@
 .pb-page {
     display: flex;
     justify-content: space-around;
-    line-height: 1.2;
+    font-size: 16px;
+    line-height: 1.4;
     background-color: white;
     box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.15);
     transform-origin: top left;
@@ -20,7 +25,7 @@
 
 
 .pb-page * {
-    line-height:inherit;
+    line-height: inherit; 
     overflow: hidden;
 }
 
@@ -35,56 +40,73 @@
     padding: 0;
   }
 
+  .backdrop {  
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    position: absolute;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba( 0, 0, 0, 0.7 );
+}
+
+.spinner {
+    width: 4rem;
+    height: 4rem;
+    border: 10px solid #f3f3f3;
+    border-top: 10px solid #3498db;
+    border-radius: 50%;
+    animation: spin 0.5s cubic-bezier(.35,.65,.35,.65) infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  } 
+
 @media print {
     html,
     body,
     body * {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
         visibility: hidden;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
     }
 
     .pb-container, .pb-container * {
         visibility: visible;
     }
    
-
     .pb-container { 
-        display: block;
-        position: absolute;
-        top: 0;
-        left: 0;
-        margin: 0;
-        padding: 0;
-        border: none;
-        outline: none;
+        display: block !important;
+        position: absolute !important; 
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        outline: none !important;
     }
+
+    .backdrop { 
+        display: none;
+     } 
+
 
     .pb-page {
-        break-inside: avoid;
-        page-break-after: always;
-        box-shadow: none;
+        break-inside: avoid !important;
+        page-break-after: always !important;
+        box-shadow: none !important;
+        transform: scale(1) !important;
+        height: 297mm !important;
+        width: 210mm !important;
     }
 }
-
-* {
-    margin: 0;
-    padding: 0;
-    line-height: 1;
-    font-family: Roboto;
-  }
-
-h1, h2 {
-    font-size: 64px;
-    line-height: 64px;
-    vertical-align: middle;
-    
-  }
-  
-  h1 {
-    background: tomato;
-  }
-  
-  h2 {
-    background: mediumaquamarine;
-  }
