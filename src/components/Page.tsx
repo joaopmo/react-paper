@@ -33,9 +33,9 @@ export function Page({ columns, structure, index, loading }: PageProps): JSX.Ele
         return (
           <div className={`pb-column pb-column-${columnIndex}`} key={columnIndex}>
             {column?.map((slice) => {
-              const maxHeight = slice.lowerBound.minus(slice.upperBound).toNumber() || 'none';
+              const maxHeight = slice.lowerBound - slice.upperBound || 'none';
               // const maxHeight = slice.lowerBound - slice.upperBound || 'none';
-              const top = slice.upperBound.neg().toNumber();
+              const top = -slice.upperBound;
 
               return (
                 <div

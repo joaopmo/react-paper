@@ -6,7 +6,6 @@ import { StructureObject } from '../utils/transforms';
 import { ElStyle, getStyle } from '../styles/getter';
 import debounce from '../utils/debounce';
 import { get, zip } from '../utils/accessors';
-import Big from 'big.js';
 
 interface FieldContextObject {
   subField: Subscribe | null;
@@ -16,9 +15,9 @@ interface Slice {
   path: Path;
   current: number; // index of the slice taking into account all slices with same path
   leadPage: number; // starting page
-  upperBound: Big; // starting lenght
-  lowerBound: Big; // ending length head tail
-  addedHeight: Big; // Cumulative height of slices in the page
+  upperBound: number; // starting lenght
+  lowerBound: number; // ending length head tail
+  addedHeight: number; // Cumulative height of slices in the page
 }
 
 export type PageDescriptor = Slice[];
@@ -40,20 +39,26 @@ interface PaginatorProps {
   structure: StructureObject;
 }
 
-type NonEmptyArray<T> = [T, ...T[]];
+type State = {
+  currPath: Path;
+  prevPath: Path;
+  leadPage: number;
+  currSlice: number;
+  upperBound: number;
+  lowerBound: number;
+  addedHeight: number;
+  freeHeight: number;
+  field: FieldObject;
+  style: ElStyle<number>;
+  prevSibEl?: Element;
+  nextSibEl?: Element;
+};
 
-function isNonEmptyArray<T>(arr: T[]): arr is NonEmptyArray<T> {
-  return arr.length > 0;
-}
-
-export function Paginator({ structure }: PaginatorProps) {
-  const COLUMN = 0;
-  const ROOT_FIELD = 1;
+function useElementPathMap() {
   const elementToPath = React.useRef<Map<Element, Path>>(new Map());
   const pathToElement = React.useRef<Map<string, Element>>(new Map());
-  const { height: pageHeight, scale } = useDimension();
 
-  const map = React.useMemo(() => {
+  return React.useMemo(() => {
     return {
       set(keyOne: Element, keyTwo: Path) {
         if (keyOne instanceof Element && Array.isArray(keyTwo)) {
@@ -73,26 +78,14 @@ export function Paginator({ structure }: PaginatorProps) {
       },
     };
   }, []);
-  const [schema, dispatch] = React.useReducer(reducer, [], init);
+}
+
+export function Paginator({ structure }: PaginatorProps): JSX.Element {
+  const COLUMN = 0;
+  const ROOT_FIELD = 1;
+  const { height: pageHeight, scale } = useDimension();
   const [loading, setLoading] = React.useState(true);
-
-  function init(schema: Schema): Schema {
-    schema = structure.map((column, columnIndex) => {
-      const page = column.map((_, fieldIndex) => {
-        return {
-          path: [columnIndex, fieldIndex],
-          current: 0,
-          leadPage: 0,
-          upperBound: Big(0),
-          lowerBound: Big(0),
-          addedHeight: Big(0),
-        };
-      });
-      return [page];
-    });
-
-    return schema;
-  }
+  const map = useElementPathMap();
 
   function reducer(
     state: Schema,
@@ -109,169 +102,72 @@ export function Paginator({ structure }: PaginatorProps) {
     }
   }
 
-  function calcPosition(schema: Schema, leadChanges?: Map<number, Path>) {
-    function findSlice(path: Path) {
-      const [columnIndex, fieldIndex] = path;
-      const column = schema[columnIndex];
-      let pageIt = 0;
-      let sliceIt = column[pageIt].length - 1;
-      let page = 0;
-      let slice = 0;
+  const findSlice = React.useCallback((path: Path, schema: Schema) => {
+    const [columnIndex, fieldIndex] = path;
+    const column = schema[columnIndex];
+    let pageIt = 0;
+    let sliceIt = column[pageIt].length - 1;
+    let page = 0;
+    let slice = 0;
 
-      while (pageIt < column.length && sliceIt >= 0) {
-        if (column[pageIt][sliceIt]['path'][ROOT_FIELD] === fieldIndex) {
-          page = column[pageIt][sliceIt].leadPage;
-          slice = column[page].findIndex((value) => {
-            return value['path'][ROOT_FIELD] === fieldIndex;
-          });
-          return [page, slice];
-        }
-
-        if (column[pageIt][sliceIt]['path'][1] < fieldIndex) {
-          pageIt++;
-        } else {
-          sliceIt--;
-        }
+    while (pageIt < column.length && sliceIt >= 0) {
+      if (column[pageIt][sliceIt]['path'][ROOT_FIELD] === fieldIndex) {
+        page = column[pageIt][sliceIt].leadPage;
+        slice = column[page].findIndex((value) => {
+          return value['path'][ROOT_FIELD] === fieldIndex;
+        });
+        return [page, slice];
       }
 
-      return [page, slice];
+      if (column[pageIt][sliceIt]['path'][1] < fieldIndex) {
+        pageIt++;
+      } else {
+        sliceIt--;
+      }
     }
 
-    type State = {
-      currPath: Path;
-      prevPath: Path;
-      leadPage: number;
-      currSlice: number;
-      upperBound: Big;
-      lowerBound: Big;
-      addedHeight: Big;
-      freeHeight: Big;
-      field: FieldObject;
-      style: ElStyle<Big>;
-      prevSibEl?: Element;
-      nextSibEl?: Element;
-    };
+    return [page, slice];
+  }, []);
 
-    function boxOverflow(
-      state: State,
-      page: Slice[],
-      column: PageDescriptor[],
-      styleProp: keyof ElStyle<number>,
-    ) {
-      let currentBox = state.style[styleProp];
-      const tmp = state.style.lineHeight.minus(state.style.fontSize).toNumber();
-      // const safeMargin = new Big(Math.log10(tmp));
-      const safeMargin = new Big(0);
-      let countMargin = 0;
+  const boxOverflow = React.useCallback(
+    (state: State, page: PageDescriptor, column: ColumnDescriptor, box: keyof ElStyle<number>) => {
+      let currentBox = state.style[box];
 
       // Logic to handle margin collapse between adjacent siblings.
       // Margin collapse between parent and descendants is handled
       // by .pb-page * { overflow: hidden; } css rule.
       // =================================================================
-      if (styleProp === 'marginTop' && state.prevSibEl) {
-        currentBox = Big(0);
+      if (box === 'marginTop' && state.prevSibEl) {
+        currentBox = 0;
       }
 
-      if (styleProp === 'marginBottom' && state.nextSibEl) {
+      if (box === 'marginBottom' && state.nextSibEl) {
         const { marginTop } = getStyle(state.nextSibEl, scale);
-        currentBox = marginTop.gt(currentBox) ? marginTop : currentBox;
-        // currentBox = Math.max(marginTop, currentBox);
+        currentBox = marginTop > currentBox ? marginTop : currentBox;
       }
       // =================================================================
 
-      // if (styleProp === 'marginTop') {
-      //   const { marginTop = 0 } = state.nextSibEl ? getStyle(state.nextSibEl) : {};
-      //   marginBox += state.backSibEl ? 0 : style.marginTop;
-      //   marginBox += Math.max(marginTop, style.marginBottom);
-
-      //   if (state.freeHeight >= marginBox) {
-      //     state.lowerBound += marginBox;
-      //     state.addedHeight += marginBox;
-      //     state.freeHeight -= marginBox;
-
-      //     page.push({
-      //       path: state.currPath.slice(0, 2),
-      //       current: state.currSlice++,
-      //       leadPage: state.leadPage,
-      //       addedHeight: state.addedHeight,
-      //       upperBound: state.upperBound,
-      //       lowerBound: state.lowerBound,
-      //     });
-
-      //     return 1;
-      //   }
-      // }
-
-      if (styleProp === 'contentBox' && state.field.content === 'text') {
-        while (true) {
-          if (countMargin === 0 && state.freeHeight.gte(currentBox)) {
-            state.lowerBound = state.lowerBound.plus(currentBox);
-            state.addedHeight = state.addedHeight.plus(currentBox);
-            state.freeHeight = state.freeHeight.minus(currentBox);
-            break;
-          }
-
-          if (state.freeHeight.gte(currentBox.plus(safeMargin))) {
-            state.upperBound = state.upperBound.minus(safeMargin);
-            state.lowerBound = state.lowerBound.plus(currentBox);
-            state.addedHeight = state.addedHeight.plus(currentBox).plus(safeMargin);
-            state.freeHeight = state.freeHeight.minus(currentBox).minus(safeMargin);
-            break;
-          }
-
-          let up = new Big(0);
-          let lo = new Big(0);
-          if (countMargin === 0 && state.freeHeight.gte(state.style.lineHeight.plus(safeMargin))) {
-            state.freeHeight = state.freeHeight.minus(safeMargin);
-            const cap = state.freeHeight.minus(state.freeHeight.mod(state.style.lineHeight));
-            state.lowerBound = state.lowerBound.plus(cap);
-            lo = lo.plus(safeMargin);
-            state.addedHeight = state.addedHeight.plus(cap);
-            state.freeHeight = state.freeHeight.minus(cap);
-            currentBox = currentBox.minus(cap);
-            countMargin++;
-          }
-
-          if (state.freeHeight.gte(state.style.lineHeight.plus(safeMargin.times(2)))) {
-            state.freeHeight = state.freeHeight.minus(safeMargin.times(2));
-            const cap = state.freeHeight.minus(state.freeHeight.mod(state.style.lineHeight));
-            up = up.plus(safeMargin);
-            lo = lo.plus(safeMargin);
-            state.lowerBound = state.lowerBound.plus(cap);
-            state.addedHeight = state.addedHeight.plus(cap);
-            state.freeHeight = state.freeHeight.minus(cap);
-            currentBox = currentBox.minus(cap);
-            countMargin++;
-          }
-
-          page.push({
-            path: state.currPath.slice(0, 2),
-            current: state.currSlice++,
-            leadPage: state.leadPage,
-            addedHeight: state.addedHeight.plus(up).plus(lo),
-            upperBound: state.upperBound.minus(up),
-            lowerBound: state.lowerBound.plus(lo),
-          });
-
-          column.push([...page]);
-          page.length = 0;
-          state.addedHeight = Big(0);
-          state.freeHeight = Big(pageHeight);
-          state.upperBound = state.lowerBound;
-        }
-
-        return 0;
-      }
-
       while (true) {
-        if (state.freeHeight.gte(currentBox)) {
-          state.lowerBound = state.lowerBound.plus(currentBox);
-          state.addedHeight = state.addedHeight.plus(currentBox);
-          state.freeHeight = state.freeHeight.minus(currentBox);
+        if (state.freeHeight >= currentBox) {
+          state.lowerBound = state.lowerBound + currentBox;
+          state.addedHeight = state.addedHeight + currentBox;
+          state.freeHeight = state.freeHeight - currentBox;
           break;
         }
 
-        if (styleProp === 'marginTop' && state.currPath.length === 2) {
+        if (
+          box === 'contentBox' &&
+          state.field.content === 'text' &&
+          state.freeHeight >= state.style.lineHeight
+        ) {
+          const cap = state.freeHeight - (state.freeHeight % state.style.lineHeight);
+          state.lowerBound = state.lowerBound + cap;
+          state.addedHeight = state.addedHeight + cap;
+          state.freeHeight = state.freeHeight - cap;
+          currentBox = currentBox - cap;
+        }
+
+        if (box === 'marginTop' && state.currPath.length === 2) {
           state.leadPage++;
         }
 
@@ -286,108 +182,130 @@ export function Paginator({ structure }: PaginatorProps) {
 
         column.push([...page]);
         page.length = 0;
-        state.addedHeight = Big(0);
-        state.freeHeight = Big(pageHeight);
+        state.addedHeight = 0;
+        state.freeHeight = pageHeight;
         state.upperBound = state.lowerBound;
       }
+    },
+    [pageHeight, scale],
+  );
 
-      return 0;
-    }
+  const calcPosition = React.useCallback(
+    function (schema: Schema, leadChanges?: Map<number, Path>) {
+      function allocateFromStructure(path: Path, schema: Schema) {
+        const [leadPage, sliceIdx] = findSlice(path, schema);
+        const page: Slice[] = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
+        const column: PageDescriptor[] = schema[path[COLUMN]].slice(0, leadPage);
+        const addedHeight = page.at(-1)?.addedHeight ?? 0;
+        const freeHeight = pageHeight - addedHeight;
 
-    function allocateFromStructure(path: Path, schema: Schema) {
-      const [leadPage, sliceIdx] = findSlice(path);
-      const page: Slice[] = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
-      const column: PageDescriptor[] = schema[path[COLUMN]].slice(0, leadPage);
-      const addedHeight = page.at(-1)?.addedHeight ?? Big(0);
-      const freeHeight = Big(pageHeight).minus(addedHeight);
+        const state: State = {
+          prevPath: [],
+          currPath: path,
+          leadPage,
+          currSlice: 0,
+          upperBound: 0,
+          lowerBound: 0,
+          addedHeight,
+          freeHeight,
+          style: getStyle(map.get(path) as Element, scale),
+          field: get(structure, path) as FieldObject,
+        };
 
-      const state: State = {
-        prevPath: [],
-        currPath: path,
-        leadPage,
-        currSlice: 0,
-        upperBound: Big(0),
-        lowerBound: Big(0),
-        addedHeight,
-        freeHeight,
-        style: getStyle(map.get(path) as Element, scale),
-        field: get(structure, path) as FieldObject,
-      };
-
-      const pathStack: Path[] = [];
-      for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_FIELD]; i--) {
-        pathStack.push([path[COLUMN], i]);
-      }
-
-      while (pathStack.length > 0) {
-        state.currPath = pathStack.pop()!;
-        const parent = state.currPath.slice(0, -1);
-        state.style = getStyle(map.get(state.currPath) as Element, scale);
-
-        state.field = get(structure, state.currPath) as FieldObject;
-        state.prevSibEl = map.get([...parent, state.currPath.at(-1)! - 1]) as Element;
-        state.nextSibEl = map.get([...parent, state.currPath.at(-1)! + 1]) as Element;
-
-        if (state.prevPath.length && state.prevPath[ROOT_FIELD] !== state.currPath[ROOT_FIELD]) {
-          state.currSlice = 0;
-          state.upperBound = state.style.marginTop;
-          state.lowerBound = state.style.marginTop;
+        const pathStack: Path[] = [];
+        for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_FIELD]; i--) {
+          pathStack.push([path[COLUMN], i]);
         }
 
-        if (state.prevPath.length <= state.currPath.length) {
-          boxOverflow(state, page, column, 'marginTop');
-          boxOverflow(state, page, column, 'borderTop');
-          boxOverflow(state, page, column, 'paddingTop');
+        while (pathStack.length > 0) {
+          state.currPath = pathStack.pop()!;
+          const parent = state.currPath.slice(0, -1);
+          state.style = getStyle(map.get(state.currPath) as Element, scale);
 
-          if (state.field.children) {
-            pathStack.push([...state.currPath]);
-            for (let i = state.field.children.length - 1; i >= 0; i--) {
-              pathStack.push([...state.currPath, i]);
-            }
-            state.prevPath = [...state.currPath];
-            continue;
+          state.field = get(structure, state.currPath) as FieldObject;
+          state.prevSibEl = map.get([...parent, state.currPath.at(-1)! - 1]) as Element;
+          state.nextSibEl = map.get([...parent, state.currPath.at(-1)! + 1]) as Element;
+
+          if (state.prevPath.length && state.prevPath[ROOT_FIELD] !== state.currPath[ROOT_FIELD]) {
+            state.currSlice = 0;
+            state.upperBound = state.style.marginTop;
+            state.lowerBound = state.style.marginTop;
           }
 
-          boxOverflow(state, page, column, 'contentBox');
+          if (state.prevPath.length <= state.currPath.length) {
+            boxOverflow(state, page, column, 'marginTop');
+            boxOverflow(state, page, column, 'borderTop');
+            boxOverflow(state, page, column, 'paddingTop');
+
+            if (state.field.children) {
+              pathStack.push([...state.currPath]);
+              for (let i = state.field.children.length - 1; i >= 0; i--) {
+                pathStack.push([...state.currPath, i]);
+              }
+              state.prevPath = [...state.currPath];
+              continue;
+            }
+
+            boxOverflow(state, page, column, 'contentBox');
+          }
+
+          boxOverflow(state, page, column, 'paddingBottom');
+          boxOverflow(state, page, column, 'borderBottom');
+          boxOverflow(state, page, column, 'marginBottom');
+
+          if (state.currPath.length === 2) {
+            page.push({
+              path: state.currPath.slice(0, 2),
+              current: state.currSlice++,
+              leadPage: state.leadPage,
+              addedHeight: state.addedHeight,
+              upperBound: state.upperBound,
+              lowerBound: state.lowerBound,
+            });
+          }
+
+          state.prevPath = [...state.currPath];
         }
 
-        boxOverflow(state, page, column, 'paddingBottom');
-        boxOverflow(state, page, column, 'borderBottom');
-        boxOverflow(state, page, column, 'marginBottom');
-
-        if (state.currPath.length === 2) {
-          page.push({
-            path: state.currPath.slice(0, 2),
-            current: state.currSlice++,
-            leadPage: state.leadPage,
-            addedHeight: state.addedHeight,
-            upperBound: state.upperBound,
-            lowerBound: state.lowerBound,
-          });
+        if (page.length > 0) {
+          column.push([...page]);
         }
 
-        state.prevPath = [...state.currPath];
+        return column;
       }
 
-      if (page.length > 0) {
-        column.push([...page]);
+      // For the useEffect
+      if (!leadChanges) {
+        leadChanges = new Map();
+        structure.forEach((_, columnIndex) => {
+          leadChanges?.set(columnIndex, [columnIndex, 0]);
+        });
       }
 
-      return column;
-    }
+      for (const [column, path] of leadChanges) {
+        schema[column] = allocateFromStructure(path, schema);
+      }
+    },
+    [findSlice, pageHeight, map, scale, structure, boxOverflow],
+  );
 
-    // For the useEffect
-    if (!leadChanges) {
-      leadChanges = new Map();
-      structure.forEach((column, columnIndex) => {
-        leadChanges?.set(columnIndex, [columnIndex, 0]);
+  const [schema, dispatch] = React.useReducer(reducer, [], (schema: Schema): Schema => {
+    schema = structure.map((column, columnIndex) => {
+      const page = column.map((_, fieldIndex) => {
+        return {
+          path: [columnIndex, fieldIndex],
+          current: 0,
+          leadPage: 0,
+          upperBound: 0,
+          lowerBound: 0,
+          addedHeight: 0,
+        };
       });
-    }
+      return [page];
+    });
 
-    for (const [column, path] of leadChanges) {
-      schema[column] = allocateFromStructure(path, schema);
-    }
-  }
+    return schema;
+  });
 
   const resizeHandler = React.useCallback(
     (entries: ResizeObserverEntry[]) => {
