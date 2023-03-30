@@ -1,14 +1,15 @@
+/* eslint-disable  @typescript-eslint/no-non-null-assertion */
 import React from 'react';
 import { FieldObject, Path, Subscribe } from './Field';
-import { useDimension } from './Dimension';
 import { Page } from './Page';
 import { StructureObject } from '../utils/transforms';
 import { ElStyle, getStyle } from '../styles/getter';
 import debounce from '../utils/debounce';
 import { get, zip } from '../utils/accessors';
 
-interface FieldContextObject {
+interface SubContextObject {
   subField: Subscribe | null;
+  subColumn: Subscribe | null;
 }
 
 interface Slice {
@@ -26,12 +27,13 @@ type ColumnDescriptor = PageDescriptor[];
 
 type Schema = ColumnDescriptor[];
 
-const FieldContext = React.createContext<FieldContextObject>({
+const SubscribersContext = React.createContext<SubContextObject>({
   subField: null,
+  subColumn: null,
 });
 
-export function useField(): FieldContextObject {
-  return React.useContext(FieldContext);
+export function useSubscribers(): SubContextObject {
+  return React.useContext(SubscribersContext);
 }
 
 interface PaginatorProps {
@@ -61,20 +63,34 @@ function useElementPathMap() {
   return React.useMemo(() => {
     return {
       set(keyOne: Element, keyTwo: Path) {
-        if (keyOne instanceof Element && Array.isArray(keyTwo)) {
-          pathToElement.current.set(keyTwo.join('.'), keyOne);
-          elementToPath.current.set(keyOne, keyTwo);
-        }
+        pathToElement.current.set(keyTwo.join('.'), keyOne);
+        elementToPath.current.set(keyOne, keyTwo);
       },
       get(key: Element | Path) {
         if (Array.isArray(key)) return pathToElement.current.get(key.join('.'));
         if (key instanceof Element) return elementToPath.current.get(key);
       },
       delete(keyOne: Element, keyTwo: Path) {
-        if (keyOne instanceof Element && Array.isArray(keyTwo)) {
-          pathToElement.current.delete(keyTwo.join('.'));
-          elementToPath.current.delete(keyOne);
-        }
+        pathToElement.current.delete(keyTwo.join('.'));
+        elementToPath.current.delete(keyOne);
+      },
+    };
+  }, []);
+}
+
+function useColumnsMap() {
+  const columnsMap = React.useRef<Map<number, Element>>(new Map());
+
+  return React.useMemo(() => {
+    return {
+      set(idx: number, ref: Element) {
+        columnsMap.current.set(idx, ref);
+      },
+      get(idx: number) {
+        return columnsMap.current.get(idx);
+      },
+      delete(idx: number) {
+        return columnsMap.current.delete(idx);
       },
     };
   }, []);
@@ -83,9 +99,9 @@ function useElementPathMap() {
 export function Paginator({ structure }: PaginatorProps): JSX.Element {
   const COLUMN = 0;
   const ROOT_FIELD = 1;
-  const { height: pageHeight, scale } = useDimension();
   const [loading, setLoading] = React.useState(true);
-  const map = useElementPathMap();
+  const fieldsMap = useElementPathMap();
+  const columnsMap = useColumnsMap();
 
   function reducer(
     state: Schema,
@@ -142,11 +158,12 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
       }
 
       if (box === 'marginBottom' && state.nextSibEl) {
-        const { marginTop } = getStyle(state.nextSibEl, scale);
+        const { marginTop } = getStyle(state.nextSibEl);
         currentBox = marginTop > currentBox ? marginTop : currentBox;
       }
       // =================================================================
 
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         if (state.freeHeight >= currentBox) {
           state.lowerBound = state.lowerBound + currentBox;
@@ -183,97 +200,101 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
         column.push([...page]);
         page.length = 0;
         state.addedHeight = 0;
-        state.freeHeight = pageHeight;
         state.upperBound = state.lowerBound;
+        state.freeHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!)['contentBox'];
       }
     },
-    [pageHeight, scale],
+    [columnsMap],
+  );
+
+  const allocateFromStructure = React.useCallback(
+    (path: Path, schema: Schema) => {
+      const [leadPage, sliceIdx] = findSlice(path, schema);
+      const page: Slice[] = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
+      const column: PageDescriptor[] = schema[path[COLUMN]].slice(0, leadPage);
+      const { contentBox: columnHeight } = getStyle(columnsMap.get(path[COLUMN])!);
+      const addedHeight = page.at(-1)?.addedHeight ?? 0;
+      const freeHeight = columnHeight - addedHeight;
+
+      const state: State = {
+        prevPath: [],
+        currPath: path,
+        leadPage,
+        currSlice: 0,
+        upperBound: 0,
+        lowerBound: 0,
+        addedHeight,
+        freeHeight,
+        style: getStyle(fieldsMap.get(path) as Element),
+        field: get(structure, path) as FieldObject,
+      };
+
+      const pathStack: Path[] = [];
+      for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_FIELD]; i--) {
+        pathStack.push([path[COLUMN], i]);
+      }
+
+      while (pathStack.length > 0) {
+        state.currPath = pathStack.pop()!;
+        const parent = state.currPath.slice(0, -1);
+        state.style = getStyle(fieldsMap.get(state.currPath) as Element);
+
+        state.field = get(structure, state.currPath) as FieldObject;
+        state.prevSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! - 1]) as Element;
+        state.nextSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! + 1]) as Element;
+
+        if (state.prevPath.length && state.prevPath[ROOT_FIELD] !== state.currPath[ROOT_FIELD]) {
+          state.currSlice = 0;
+          state.upperBound = state.style.marginTop;
+          state.lowerBound = state.style.marginTop;
+        }
+
+        if (state.prevPath.length <= state.currPath.length) {
+          boxOverflow(state, page, column, 'marginTop');
+          boxOverflow(state, page, column, 'borderTop');
+          boxOverflow(state, page, column, 'paddingTop');
+
+          if (state.field.children) {
+            pathStack.push([...state.currPath]);
+            for (let i = state.field.children.length - 1; i >= 0; i--) {
+              pathStack.push([...state.currPath, i]);
+            }
+            state.prevPath = [...state.currPath];
+            continue;
+          }
+
+          boxOverflow(state, page, column, 'contentBox');
+        }
+
+        boxOverflow(state, page, column, 'paddingBottom');
+        boxOverflow(state, page, column, 'borderBottom');
+        boxOverflow(state, page, column, 'marginBottom');
+
+        if (state.currPath.length === 2) {
+          page.push({
+            path: state.currPath.slice(0, 2),
+            current: state.currSlice++,
+            leadPage: state.leadPage,
+            addedHeight: state.addedHeight,
+            upperBound: state.upperBound,
+            lowerBound: state.lowerBound,
+          });
+        }
+
+        state.prevPath = [...state.currPath];
+      }
+
+      if (page.length > 0) {
+        column.push([...page]);
+      }
+
+      return column;
+    },
+    [findSlice, columnsMap, fieldsMap, structure, boxOverflow],
   );
 
   const calcPosition = React.useCallback(
     function (schema: Schema, leadChanges?: Map<number, Path>) {
-      function allocateFromStructure(path: Path, schema: Schema) {
-        const [leadPage, sliceIdx] = findSlice(path, schema);
-        const page: Slice[] = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
-        const column: PageDescriptor[] = schema[path[COLUMN]].slice(0, leadPage);
-        const addedHeight = page.at(-1)?.addedHeight ?? 0;
-        const freeHeight = pageHeight - addedHeight;
-
-        const state: State = {
-          prevPath: [],
-          currPath: path,
-          leadPage,
-          currSlice: 0,
-          upperBound: 0,
-          lowerBound: 0,
-          addedHeight,
-          freeHeight,
-          style: getStyle(map.get(path) as Element, scale),
-          field: get(structure, path) as FieldObject,
-        };
-
-        const pathStack: Path[] = [];
-        for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_FIELD]; i--) {
-          pathStack.push([path[COLUMN], i]);
-        }
-
-        while (pathStack.length > 0) {
-          state.currPath = pathStack.pop()!;
-          const parent = state.currPath.slice(0, -1);
-          state.style = getStyle(map.get(state.currPath) as Element, scale);
-
-          state.field = get(structure, state.currPath) as FieldObject;
-          state.prevSibEl = map.get([...parent, state.currPath.at(-1)! - 1]) as Element;
-          state.nextSibEl = map.get([...parent, state.currPath.at(-1)! + 1]) as Element;
-
-          if (state.prevPath.length && state.prevPath[ROOT_FIELD] !== state.currPath[ROOT_FIELD]) {
-            state.currSlice = 0;
-            state.upperBound = state.style.marginTop;
-            state.lowerBound = state.style.marginTop;
-          }
-
-          if (state.prevPath.length <= state.currPath.length) {
-            boxOverflow(state, page, column, 'marginTop');
-            boxOverflow(state, page, column, 'borderTop');
-            boxOverflow(state, page, column, 'paddingTop');
-
-            if (state.field.children) {
-              pathStack.push([...state.currPath]);
-              for (let i = state.field.children.length - 1; i >= 0; i--) {
-                pathStack.push([...state.currPath, i]);
-              }
-              state.prevPath = [...state.currPath];
-              continue;
-            }
-
-            boxOverflow(state, page, column, 'contentBox');
-          }
-
-          boxOverflow(state, page, column, 'paddingBottom');
-          boxOverflow(state, page, column, 'borderBottom');
-          boxOverflow(state, page, column, 'marginBottom');
-
-          if (state.currPath.length === 2) {
-            page.push({
-              path: state.currPath.slice(0, 2),
-              current: state.currSlice++,
-              leadPage: state.leadPage,
-              addedHeight: state.addedHeight,
-              upperBound: state.upperBound,
-              lowerBound: state.lowerBound,
-            });
-          }
-
-          state.prevPath = [...state.currPath];
-        }
-
-        if (page.length > 0) {
-          column.push([...page]);
-        }
-
-        return column;
-      }
-
       // For the useEffect
       if (!leadChanges) {
         leadChanges = new Map();
@@ -286,7 +307,7 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
         schema[column] = allocateFromStructure(path, schema);
       }
     },
-    [findSlice, pageHeight, map, scale, structure, boxOverflow],
+    [structure, allocateFromStructure],
   );
 
   const [schema, dispatch] = React.useReducer(reducer, [], (schema: Schema): Schema => {
@@ -311,7 +332,7 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
     (entries: ResizeObserverEntry[]) => {
       // Column to the path of its first resized field
       const leadChanges = entries.reduce((acc, { target: el }) => {
-        const potentialPath = map.get(el) as Path;
+        const potentialPath = fieldsMap.get(el) as Path;
         const availablePath = acc.get(potentialPath[COLUMN]);
 
         if (availablePath !== undefined) {
@@ -330,7 +351,7 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
       dispatch({ type: 'resize', payload: { leadChanges } });
       setLoading(false);
     },
-    [map],
+    [fieldsMap],
   );
 
   const debouncedResizeHandler = React.useMemo(() => {
@@ -342,21 +363,21 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
 
     return {
       observe(el: Element, path: Path) {
-        map.set(el, path);
+        fieldsMap.set(el, path);
         if (path.length === 2) {
           resize.observe(el, { box: 'border-box' });
           // dispatch({ type: 'resize', payload: {} });
         }
       },
       unobserve(el: Element, path: Path) {
-        map.delete(el, path);
+        fieldsMap.delete(el, path);
         if (path.length === 2) {
           resize.unobserve(el);
           // dispatch({ type: 'resize', payload: {} });
         }
       },
     };
-  }, [debouncedResizeHandler, map]);
+  }, [debouncedResizeHandler, fieldsMap]);
 
   const subField = React.useCallback(
     (ref: Element, path: Path) => {
@@ -368,12 +389,23 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
     [observer],
   );
 
+  const subColumn = React.useCallback(
+    (ref: Element, path: Path) => {
+      const [pageIdx, columnIdx] = path;
+      if (pageIdx === 0) columnsMap.set(columnIdx, ref);
+      return function unsubscribe() {
+        if (pageIdx === 0) columnsMap.delete(columnIdx);
+      };
+    },
+    [columnsMap],
+  );
+
   React.useEffect(() => {
     dispatch({ type: 'resize', payload: {} });
   }, [dispatch]);
 
   return (
-    <FieldContext.Provider value={{ subField }}>
+    <SubscribersContext.Provider value={{ subField, subColumn }}>
       <div className="pb-container">
         {zip(schema).map((columns: Array<PageDescriptor | null>, index) => {
           return (
@@ -387,6 +419,6 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
           );
         })}
       </div>
-    </FieldContext.Provider>
+    </SubscribersContext.Provider>
   );
 }

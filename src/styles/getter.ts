@@ -1,6 +1,3 @@
-import { Path } from '../components/Field';
-import Big from 'big.js';
-
 export interface ElStyle<T> {
   // marginBox: T;
   contentBox: T;
@@ -15,11 +12,7 @@ export interface ElStyle<T> {
   borderBottom: T;
 }
 
-export interface ElMeta<T> extends Partial<ElStyle<T>> {
-  path: Path;
-}
-
-export const getStyle = (el: Element, scale?: number): ElStyle<number> => {
+export const getStyle = (el: Element): ElStyle<number> => {
   const style = window.getComputedStyle(el);
 
   const properties: ElStyle<string> = {

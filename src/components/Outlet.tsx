@@ -1,6 +1,6 @@
 import React from 'react';
 import { Path, FieldObject } from './Field';
-import { useField } from './Paginator';
+import { useSubscribers } from './Paginator';
 
 interface OutletContextObject {
   outlet: JSX.Element | null;
@@ -37,7 +37,7 @@ export function OutletProvider({
 }: OutletProviderProps): JSX.Element {
   const [ref, setRef] = React.useState<Element | null>(null);
 
-  const { subField } = useField();
+  const { subField } = useSubscribers();
 
   React.useLayoutEffect(() => {
     if (ref && subField) return subField(ref, path);
@@ -49,7 +49,7 @@ export function OutletProvider({
         setRef(el);
       }
     },
-    [ref],
+    [ref, subscribe],
   );
 
   return (
