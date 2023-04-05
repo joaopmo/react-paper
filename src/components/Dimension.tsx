@@ -42,7 +42,7 @@ export function DimensionProvider({
 
   const reference = React.useCallback(
     (ref: HTMLElement | null) => {
-      if (ref) dimensionRef.current = ref;
+      if (ref !== null) dimensionRef.current = ref;
     },
     [dimensionRef],
   );
@@ -57,7 +57,7 @@ export function DimensionProvider({
     const width = 210 * multiplier;
     const container = dimensionRef.current;
 
-    if (container) {
+    if (container !== null) {
       const wrapWidth = container.offsetWidth;
       const docWidth = wrapWidth * widthFrac;
 
@@ -82,7 +82,7 @@ export function DimensionProvider({
   }, [resizeHandler]);
 
   return (
-    <div className="pb-dimension" ref={reference}>
+    <div className="rp-dimension" ref={reference}>
       <DimensionContext.Provider value={dimensions}>{children}</DimensionContext.Provider>
     </div>
   );

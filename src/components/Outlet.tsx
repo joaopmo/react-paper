@@ -1,25 +1,23 @@
 import React from 'react';
-import { Path, FieldObject } from './Field';
 import { useSubscribers } from './Paginator';
+import { type StructureField, type Path } from '../types';
 
 interface OutletContextObject {
   outlet: JSX.Element | null;
-  path: Path | null;
   reference: ((arg: Element | null) => void) | null;
 }
 
 const OutletContext = React.createContext<OutletContextObject>({
   outlet: null,
-  path: null,
   reference: null,
 });
 
-export function useOutlet(): OutletContextObject {
-  return React.useContext(OutletContext);
+export function useReference(): OutletContextObject['reference'] {
+  return React.useContext(OutletContext).reference;
 }
 
 export function Outlet(): OutletContextObject['outlet'] {
-  return useOutlet().outlet;
+  return React.useContext(OutletContext).outlet;
 }
 
 interface OutletProviderProps {
@@ -40,27 +38,29 @@ export function OutletProvider({
   const { subField } = useSubscribers();
 
   React.useLayoutEffect(() => {
-    if (ref && subField) return subField(ref, path);
+    if (ref != null && subField != null) return subField(ref, path);
   }, [path, ref, subField]);
 
   const reference = React.useCallback(
     (el: Element | null) => {
-      if (el && el !== ref && subscribe) {
+      if (el != null && el !== ref && subscribe) {
         setRef(el);
       }
     },
     [ref, subscribe],
   );
 
-  return (
-    <OutletContext.Provider value={{ outlet, reference, path }}>{children}</OutletContext.Provider>
-  );
+  return <OutletContext.Provider value={{ outlet, reference }}>{children}</OutletContext.Provider>;
 }
 
-export function renderWithOutlet(structure: FieldObject, path: Path = [], sub = true): JSX.Element {
+export function renderWithOutlet(
+  structure: StructureField,
+  path: Path = [],
+  sub = true,
+): JSX.Element {
   const { element, children } = structure;
   const outlets: React.ReactNode[] = [];
-  if (children) {
+  if (children !== null) {
     children.forEach((child, index) => {
       outlets.push(renderWithOutlet(child, [...path, index], sub));
     });

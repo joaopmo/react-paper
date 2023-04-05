@@ -1,4 +1,4 @@
 import React from 'react';
-export function Spinner() {
-  return <div className="spinner"></div>;
+export function Spinner(): JSX.Element {
+  return <div className="rp-spinner"></div>;
 }

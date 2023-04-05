@@ -1,4 +1,5 @@
 node_modules/
-react-router/
 dist/
 .prettierrc.cjs
+.eslintrc.cjs
+env.d.ts

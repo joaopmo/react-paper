@@ -1,32 +1,67 @@
-import { FieldObjectPartial, FieldObject } from '../components/Field';
-import { ColumnObject, ColumnObjectPartial } from '../components/Column';
+import React from 'react';
+import { Field } from '../components';
+import { assert } from './assert';
+import {
+  type StructureField,
+  type StructureFieldPartial,
+  type Structure,
+  type StructurePartial,
+  type StructureColumn,
+} from '../types';
 
-export type StructureObject = ColumnObject[];
-type StructureObjectPartial = ColumnObjectPartial[];
+export function fieldNormalizer(field: StructureFieldPartial): StructureField {
+  const { element, content, children } = field;
+  let normalized: StructureField['children'] = null;
 
-export function fieldNormalizer(field: FieldObjectPartial): FieldObject {
-  const { element, render, content, children } = field;
-  let normalized: FieldObject['children'] = null;
-
-  if (children) {
+  if (children !== null && children !== undefined) {
     normalized = [];
     children.forEach((child) => {
-      (normalized as FieldObject[]).push(fieldNormalizer(child));
+      (normalized as StructureColumn).push(fieldNormalizer(child));
     });
   }
 
   return {
-    element: element || null,
-    render: render || null,
-    content: content || 'text',
+    element: element ?? null,
+    content: content ?? 'text',
     children: normalized,
   };
 }
 
-export function createStructure(columns: StructureObjectPartial): StructureObject {
+export function createStructure(columns: StructurePartial): Structure {
   return columns.map((column) => {
     return column.map((field) => {
       return fieldNormalizer(field);
     });
   });
+}
+
+export function structureFromChildren(children: React.ReactNode): StructureColumn {
+  const structure: StructureColumn = [];
+
+  React.Children.forEach(children, (child) => {
+    if (!React.isValidElement(child)) {
+      return;
+    }
+
+    assert(
+      child.type === Field,
+      `[${
+        typeof child.type === 'string' ? child.type : child.type.name
+      }] is not a <Field> component. All component children of <Column> must be a <Field>`,
+    );
+
+    const field: StructureField = {
+      element: child.props.element ?? null,
+      content: child.props.content ?? 'text',
+      children: null,
+    };
+
+    if (child.props.children !== null && child.props.children !== undefined) {
+      field.children = structureFromChildren(child.props.children);
+    }
+
+    structure.push(field);
+  });
+
+  return structure;
 }

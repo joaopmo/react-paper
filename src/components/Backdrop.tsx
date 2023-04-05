@@ -1,8 +1,13 @@
 import React from 'react';
 
-export function Backdrop({ children, open }: { children: React.ReactNode; open: boolean }) {
+interface BackdropProps {
+  children: React.ReactNode;
+  open: boolean;
+}
+
+export function Backdrop({ children, open }: BackdropProps): JSX.Element {
   return (
-    <div className="backdrop" style={{ display: open ? 'flex' : 'none' }}>
+    <div className="rp-backdrop" style={{ display: open ? 'flex' : 'none' }}>
       {children}
     </div>
   );

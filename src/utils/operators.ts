@@ -1,3 +1,3 @@
 export function xor(p: unknown, q: unknown): boolean {
-  return !!p !== !!q;
+  return Boolean(p) !== Boolean(q);
 }

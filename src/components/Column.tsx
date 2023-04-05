@@ -1,13 +1,12 @@
-import { invariant } from '../invariant';
-import { FieldObject, FieldObjectPartial } from './Field';
+import { assert } from '../utils';
 
-export type ColumnObject = FieldObject[];
-export type ColumnObjectPartial = FieldObjectPartial[];
-
-export function Column(): JSX.Element {
-  invariant(
+interface ColumnProps {
+  children: JSX.Element;
+}
+export function Column(props: ColumnProps): JSX.Element {
+  assert(
     false,
-    `A <Column> is only ever to be used as the child of <PageBreaker> element, ` +
-      `never rendered directly. Please wrap your <Column> in a <PageBreaker>.`,
+    `A <Column> is only ever to be used as the child of <Paper> component, ` +
+      `never rendered directly. Please wrap your <Column> in a <Paper>.`,
   );
 }

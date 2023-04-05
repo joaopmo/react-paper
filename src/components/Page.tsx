@@ -1,23 +1,22 @@
 import React from 'react';
 import { useDimension } from './Dimension';
-import { PageDescriptor, useSubscribers } from './Paginator';
+import { useSubscribers } from './Paginator';
 import { renderWithOutlet } from './Outlet';
-import { StructureObject } from '../utils/transforms';
-import { get } from '../utils/accessors';
-import { FieldObject, Subscribe } from './Field';
+import { get } from '../utils';
 import { Backdrop } from './Backdrop';
 import { Spinner } from './Spinner';
+import { type SchemaPage, type Structure, type StructureField } from '../types';
 
 interface PageProps {
-  structure: StructureObject;
-  columns: Array<PageDescriptor | null>;
+  structure: Structure;
+  columns: Array<SchemaPage | null>;
   index: number;
   loading: boolean;
 }
 
 interface ColumnProps {
-  column: PageDescriptor | null;
-  structure: StructureObject;
+  column: SchemaPage | null;
+  structure: Structure;
   pageIndex: number;
   columnIndex: number;
 }
@@ -27,12 +26,12 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
   const { subColumn } = useSubscribers();
 
   React.useLayoutEffect(() => {
-    if (ref && subColumn) return subColumn(ref, [pageIndex, columnIndex]);
+    if (ref != null && subColumn != null) return subColumn(ref, [pageIndex, columnIndex]);
   }, [columnIndex, pageIndex, ref, subColumn]);
 
   const reference = React.useCallback(
     (el: Element | null) => {
-      if (el && el !== ref && pageIndex === 0) {
+      if (el != null && el !== ref && pageIndex === 0) {
         setRef(el);
       }
     },
@@ -40,9 +39,10 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
   );
 
   return (
-    <div className={`pb-column pb-column-${columnIndex}`} ref={reference}>
+    <div className={`rp-column rp-column-${columnIndex}`} ref={reference}>
       {column?.map((slice) => {
-        const maxHeight = slice.lowerBound - slice.upperBound || 'none';
+        const calcHeight = slice.lowerBound - slice.upperBound;
+        const maxHeight = calcHeight !== 0 ? calcHeight : 'none';
         const top = -slice.upperBound;
 
         return (
@@ -52,7 +52,7 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
           >
             <div style={{ position: 'relative', top }} data-top={-slice.upperBound}>
               {renderWithOutlet(
-                get(structure, slice.path) as FieldObject,
+                get(structure, slice.path) as StructureField,
                 slice.path,
                 slice.current === 0,
               )}
@@ -69,7 +69,7 @@ export function Page({ columns, structure, index, loading }: PageProps): JSX.Ele
 
   return (
     <div
-      className="pb-page"
+      className="rp-page"
       style={{
         transform: `scale(${scale})`,
         ...dimension,

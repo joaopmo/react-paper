@@ -1,31 +1,23 @@
 /* eslint-disable  @typescript-eslint/no-non-null-assertion */
 import React from 'react';
-import { FieldObject, Path, Subscribe } from './Field';
+import { DimensionProvider } from './Dimension';
 import { Page } from './Page';
-import { StructureObject } from '../utils/transforms';
-import { ElStyle, getStyle } from '../styles/getter';
-import debounce from '../utils/debounce';
-import { get, zip } from '../utils/accessors';
+import { getStyle, get, zip, debounce } from '../utils';
+import {
+  type Style,
+  type Subscribe,
+  type SchemaColumn,
+  type SchemaPage,
+  type Schema,
+  type Structure,
+  type StructureField,
+  type Path,
+} from '../types';
 
 interface SubContextObject {
   subField: Subscribe | null;
   subColumn: Subscribe | null;
 }
-
-interface Slice {
-  path: Path;
-  current: number; // index of the slice taking into account all slices with same path
-  leadPage: number; // starting page
-  upperBound: number; // starting lenght
-  lowerBound: number; // ending length head tail
-  addedHeight: number; // Cumulative height of slices in the page
-}
-
-export type PageDescriptor = Slice[];
-
-type ColumnDescriptor = PageDescriptor[];
-
-type Schema = ColumnDescriptor[];
 
 const SubscribersContext = React.createContext<SubContextObject>({
   subField: null,
@@ -37,11 +29,11 @@ export function useSubscribers(): SubContextObject {
 }
 
 interface PaginatorProps {
-  children?: React.ReactNode | null;
-  structure: StructureObject;
+  structure: Structure;
+  pageWidth: number;
 }
 
-type State = {
+interface State {
   currPath: Path;
   prevPath: Path;
   leadPage: number;
@@ -50,11 +42,11 @@ type State = {
   lowerBound: number;
   addedHeight: number;
   freeHeight: number;
-  field: FieldObject;
-  style: ElStyle<number>;
+  field: StructureField;
+  style: Style<number>;
   prevSibEl?: Element;
   nextSibEl?: Element;
-};
+}
 
 function useElementPathMap() {
   const elementToPath = React.useRef<Map<Element, Path>>(new Map());
@@ -96,7 +88,7 @@ function useColumnsMap() {
   }, []);
 }
 
-export function Paginator({ structure }: PaginatorProps): JSX.Element {
+export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element {
   const COLUMN = 0;
   const ROOT_FIELD = 1;
   const [loading, setLoading] = React.useState(true);
@@ -127,15 +119,15 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
     let slice = 0;
 
     while (pageIt < column.length && sliceIt >= 0) {
-      if (column[pageIt][sliceIt]['path'][ROOT_FIELD] === fieldIndex) {
+      if (column[pageIt][sliceIt].path[ROOT_FIELD] === fieldIndex) {
         page = column[pageIt][sliceIt].leadPage;
         slice = column[page].findIndex((value) => {
-          return value['path'][ROOT_FIELD] === fieldIndex;
+          return value.path[ROOT_FIELD] === fieldIndex;
         });
         return [page, slice];
       }
 
-      if (column[pageIt][sliceIt]['path'][1] < fieldIndex) {
+      if (column[pageIt][sliceIt].path[1] < fieldIndex) {
         pageIt++;
       } else {
         sliceIt--;
@@ -146,18 +138,18 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
   }, []);
 
   const boxOverflow = React.useCallback(
-    (state: State, page: PageDescriptor, column: ColumnDescriptor, box: keyof ElStyle<number>) => {
+    (state: State, page: SchemaPage, column: SchemaColumn, box: keyof Style<number>) => {
       let currentBox = state.style[box];
 
       // Logic to handle margin collapse between adjacent siblings.
       // Margin collapse between parent and descendants is handled
       // by .pb-page * { overflow: hidden; } css rule.
       // =================================================================
-      if (box === 'marginTop' && state.prevSibEl) {
+      if (box === 'marginTop' && state.prevSibEl != null) {
         currentBox = 0;
       }
 
-      if (box === 'marginBottom' && state.nextSibEl) {
+      if (box === 'marginBottom' && state.nextSibEl != null) {
         const { marginTop } = getStyle(state.nextSibEl);
         currentBox = marginTop > currentBox ? marginTop : currentBox;
       }
@@ -201,7 +193,7 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
         page.length = 0;
         state.addedHeight = 0;
         state.upperBound = state.lowerBound;
-        state.freeHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!)['contentBox'];
+        state.freeHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!).contentBox;
       }
     },
     [columnsMap],
@@ -210,8 +202,8 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
   const allocateFromStructure = React.useCallback(
     (path: Path, schema: Schema) => {
       const [leadPage, sliceIdx] = findSlice(path, schema);
-      const page: Slice[] = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
-      const column: PageDescriptor[] = schema[path[COLUMN]].slice(0, leadPage);
+      const page: SchemaPage = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
+      const column: SchemaColumn = schema[path[COLUMN]].slice(0, leadPage);
       const { contentBox: columnHeight } = getStyle(columnsMap.get(path[COLUMN])!);
       const addedHeight = page.at(-1)?.addedHeight ?? 0;
       const freeHeight = columnHeight - addedHeight;
@@ -226,7 +218,7 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
         addedHeight,
         freeHeight,
         style: getStyle(fieldsMap.get(path) as Element),
-        field: get(structure, path) as FieldObject,
+        field: get(structure, path) as StructureField,
       };
 
       const pathStack: Path[] = [];
@@ -239,11 +231,14 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
         const parent = state.currPath.slice(0, -1);
         state.style = getStyle(fieldsMap.get(state.currPath) as Element);
 
-        state.field = get(structure, state.currPath) as FieldObject;
+        state.field = get(structure, state.currPath) as StructureField;
         state.prevSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! - 1]) as Element;
         state.nextSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! + 1]) as Element;
 
-        if (state.prevPath.length && state.prevPath[ROOT_FIELD] !== state.currPath[ROOT_FIELD]) {
+        if (
+          state.prevPath.length > 0 &&
+          state.prevPath[ROOT_FIELD] !== state.currPath[ROOT_FIELD]
+        ) {
           state.currSlice = 0;
           state.upperBound = state.style.marginTop;
           state.lowerBound = state.style.marginTop;
@@ -254,7 +249,7 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
           boxOverflow(state, page, column, 'borderTop');
           boxOverflow(state, page, column, 'paddingTop');
 
-          if (state.field.children) {
+          if (state.field.children != null) {
             pathStack.push([...state.currPath]);
             for (let i = state.field.children.length - 1; i >= 0; i--) {
               pathStack.push([...state.currPath, i]);
@@ -296,7 +291,7 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
   const calcPosition = React.useCallback(
     function (schema: Schema, leadChanges?: Map<number, Path>) {
       // For the useEffect
-      if (!leadChanges) {
+      if (leadChanges == null) {
         leadChanges = new Map();
         structure.forEach((_, columnIndex) => {
           leadChanges?.set(columnIndex, [columnIndex, 0]);
@@ -406,19 +401,21 @@ export function Paginator({ structure }: PaginatorProps): JSX.Element {
 
   return (
     <SubscribersContext.Provider value={{ subField, subColumn }}>
-      <div className="pb-container">
-        {zip(schema).map((columns: Array<PageDescriptor | null>, index) => {
-          return (
-            <Page
-              columns={columns}
-              structure={structure}
-              index={index}
-              loading={loading}
-              key={index}
-            />
-          );
-        })}
-      </div>
+      <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
+        <div className="rp-container">
+          {zip(schema).map((columns: Array<SchemaPage | null>, index) => {
+            return (
+              <Page
+                columns={columns}
+                structure={structure}
+                index={index}
+                loading={loading}
+                key={index}
+              />
+            );
+          })}
+        </div>
+      </DimensionProvider>
     </SubscribersContext.Provider>
   );
 }

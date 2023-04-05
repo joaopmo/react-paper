@@ -1,4 +1,8 @@
-function debounce<F extends (...args: any[]) => any>(cb: F, ms: number, immediate: boolean): F {
+export function debounce<F extends (...args: any[]) => any>(
+  cb: F,
+  ms: number,
+  immediate: boolean,
+): F {
   let timeout: null | ReturnType<typeof setTimeout> = null;
 
   return function (this: any, ...args: Parameters<F>) {
@@ -14,5 +18,3 @@ function debounce<F extends (...args: any[]) => any>(cb: F, ms: number, immediat
     if (callNow) cb.apply(this, args);
   } as F;
 }
-
-export default debounce;

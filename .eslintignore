@@ -1,6 +1,6 @@
 node_modules/
 dist/
-react-router/
 .prettierrc.cjs
 .eslintrc.cjs
 env.d.ts
+vite.config.ts

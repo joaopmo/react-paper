@@ -1,29 +1,24 @@
-import { invariant } from '../invariant';
-import { Path } from '../components/Field';
-import { StructureObject } from './transforms';
-import { ColumnObject } from '../components/Column';
-import { FieldObject } from '../components/Field';
+import { assert } from './assert';
+import { type Structure, type StructureColumn, type StructureField, type Path } from '../types';
 
-type StructUnion = StructureObject | ColumnObject | FieldObject | null;
+type StructUnion = Structure | StructureColumn | StructureField | null;
 
-const isValidArray = (arr: any): arr is Array<any> => {
+const isValidArray = (arr: any): arr is any[] => {
   return Array.isArray(arr);
 };
 
-export function get(structure: StructUnion, path: Path) {
+export function get(structure: StructUnion, path: Path): StructUnion {
   const isArray = isValidArray(path);
-  invariant(isArray, `Expected path to be an array but got ${typeof path}`);
+  assert(isArray, `Expected path to be an array but got ${typeof path}`);
 
-  const result = path.reduce((acc, key) => {
+  return path.reduce<StructUnion>((acc, key) => {
     if (isValidArray(acc)) return acc[key];
-    if (acc && Object.hasOwn(acc, 'children')) return acc.children![key];
+    if (acc?.children !== null && acc?.children !== undefined) return acc.children[key];
     return null;
-  }, structure as StructUnion);
-
-  return result;
+  }, structure);
 }
 
-export function zip<T extends any[][]>(arr: T) {
+export function zip<T extends any[][]>(arr: T): any[][] {
   const maxLengthArr: null[] = Array(Math.max(...arr.map((a) => a.length))).fill(null);
   return maxLengthArr.map((_, i) => arr.map((a) => a[i] ?? null));
 }

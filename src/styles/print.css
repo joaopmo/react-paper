@@ -1,0 +1,45 @@
+@page {
+    size: A4 portrait;
+    margin: 0;
+    padding: 0;
+}
+
+@media print {
+    html,
+    body,
+    body * {
+        visibility: hidden;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    .rp-container, .rp-container * {
+        visibility: visible;
+    }
+
+    .rp-container {
+        display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        outline: none !important;
+    }
+
+    .rp-backdrop {
+        display: none;
+    }
+
+    .rp-page {
+        break-inside: avoid !important;
+        page-break-after: always !important;
+        box-shadow: none !important;
+        transform: scale(1) !important;
+        height: 297mm !important;
+        width: 210mm !important;
+    }
+}

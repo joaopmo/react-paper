@@ -1,35 +1,66 @@
 {
-  "name": "pagebreaker",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@joaopmo/react-paper",
+  "version": "1.0.2",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.es.js",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.cjs"
+    },
+    "./css/base": "./dist/styles/base.css",
+    "./css/print": "./dist/styles/print.css"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "pnpm build:scripts && pnpm build:types && pnpm build:styles",
+    "build:scripts": "vite build",
+    "build:types": "tsc --emitDeclarationOnly",
+    "build:styles": "pnpm build:styles:base && pnpm build:styles:print",
+    "build:styles:base": "postcss --use autoprefixer -o dist/styles/base.css src/styles/base.css",
+    "build:styles:print": "postcss --use autoprefixer -o dist/styles/print.css src/styles/print.css",
     "preview": "vite preview",
-    "lint": "eslint . --ext .ts,.tsx"
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "prepublishOnly": "pnpm build"
   },
-  "dependencies": {
-    "big.js": "^6.2.1",
+  "peerDependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/big.js": "^6.1.6",
-    "@types/react": "^18.0.26",
-    "@types/react-dom": "^18.0.9",
-    "@typescript-eslint/eslint-plugin": "^4.28.3",
-    "@typescript-eslint/parser": "^4.28.3",
-    "@vitejs/plugin-react": "^3.0.0",
-    "eslint": "^7.30.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-import": "^2.23.4",
-    "eslint-plugin-jsx-a11y": "^6.4.1",
-    "eslint-plugin-react": "^7.24.0",
-    "eslint-plugin-react-hooks": "5.0.0-next-de7d1c907-20221223",
-    "lorem-ipsum": "^2.0.8",
-    "prettier": "^2.5.1",
+    "@storybook/addon-essentials": "^7.0.0",
+    "@storybook/addon-interactions": "^7.0.0",
+    "@storybook/addon-links": "^7.0.0",
+    "@storybook/blocks": "^7.0.0",
+    "@storybook/react": "^7.0.0",
+    "@storybook/react-vite": "^7.0.0",
+    "@storybook/testing-library": "^0.0.14-next.2",
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
+    "@typescript-eslint/eslint-plugin": "^5.43.0",
+    "@vitejs/plugin-react": "^3.1.0",
+    "autoprefixer": "^10.4.14",
+    "eslint": "^8.37.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-config-standard-with-typescript": "^34.0.1",
+    "eslint-plugin-import": "^2.25.2",
+    "eslint-plugin-n": "^15.0.0",
+    "eslint-plugin-promise": "^6.0.0",
+    "eslint-plugin-react": "^7.32.2",
+    "postcss": "^8.4.21",
+    "postcss-cli": "^10.1.0",
+    "prettier": "^2.8.7",
+    "prop-types": "^15.8.1",
+    "storybook": "^7.0.0",
     "typescript": "^4.9.3",
-    "vite": "^4.0.0"
+    "vite": "^4.2.0"
   }
 }
