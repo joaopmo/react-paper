@@ -45,6 +45,7 @@ export function structureFromChildren(children: React.ReactNode): StructureColum
 
     if (child.type === React.Fragment) {
       structure.push(...structureFromChildren(child.props.children));
+      return;
     }
 
     assert(
