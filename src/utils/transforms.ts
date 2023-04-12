@@ -43,11 +43,15 @@ export function structureFromChildren(children: React.ReactNode): StructureColum
       return;
     }
 
+    if (child.type === React.Fragment) {
+      structure.push(...structureFromChildren(child.props.children));
+    }
+
     assert(
       child.type === Field,
       `[${
         typeof child.type === 'string' ? child.type : child.type.name
-      }] is not a <Field> component. All component children of <Column> must be a <Field>`,
+      }] is not a <Field> component. All component children of <Column> must be a <Field>  or <React.Fragment>`,
     );
 
     const field: StructureField = {
