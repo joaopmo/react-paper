@@ -1,6 +1,9 @@
 /* eslint-disable  @typescript-eslint/no-non-null-assertion */
 import React from 'react';
 import { useColumnsMap, SubscribersContext, type State } from './Paginator';
+import { DimensionProvider } from './Dimension';
+import { zip } from '../utils';
+import { Page } from './Page';
 import {
   type Path,
   type Schema,
@@ -53,9 +56,10 @@ function useNodePathMap() {
 
 interface PaginatorNestedProps {
   structure: Structure;
+  pageWidth: number;
 }
 
-export function PaginatorNested({ structure }: PaginatorNestedProps) {
+export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) {
   const COLUMN = 0;
   const ROOT_NODE = 1;
   const [loading, setLoading] = React.useState(true);
@@ -198,9 +202,9 @@ export function PaginatorNested({ structure }: PaginatorNestedProps) {
         const parent = state.currPath.slice(0, -1);
         state.style = getStyle((nodesMap.get(state.currPath) as Node).element);
 
-        state.field = get(structure, state.currPath) as StructureField;
-        state.prevSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! - 1]) as Element;
-        state.nextSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! + 1]) as Element;
+        state.field = nodesMap.get(state.currPath) as Node;
+        state.prevSibEl = (nodesMap.get([...parent, state.currPath.at(-1)! - 1]) as Node).element;
+        state.nextSibEl = (nodesMap.get([...parent, state.currPath.at(-1)! + 1]) as Node).element;
 
         if (state.prevPath.length > 0 && state.prevPath[ROOT_NODE] !== state.currPath[ROOT_NODE]) {
           state.currSlice = 0;
@@ -215,7 +219,7 @@ export function PaginatorNested({ structure }: PaginatorNestedProps) {
 
           if (state.field.children != null) {
             pathStack.push([...state.currPath]);
-            for (let i = state.field.children.length - 1; i >= 0; i--) {
+            for (let i = state.field.children; i >= 0; i--) {
               pathStack.push([...state.currPath, i]);
             }
             state.prevPath = [...state.currPath];
@@ -353,7 +357,21 @@ export function PaginatorNested({ structure }: PaginatorNestedProps) {
 
   return (
     <SubscribersContext.Provider value={{ subNode, subColumn, subField: null }}>
-      HW
+      <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
+        <div className="rp-container">
+          {zip(schema).map((columns: Array<SchemaPage | null>, index) => {
+            return (
+              <Page
+                columns={columns}
+                structure={structure}
+                index={index}
+                loading={loading}
+                key={index}
+              />
+            );
+          })}
+        </div>
+      </DimensionProvider>
     </SubscribersContext.Provider>
   );
 }

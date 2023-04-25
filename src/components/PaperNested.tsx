@@ -7,9 +7,10 @@ import { type Structure } from '../types';
 import { PaginatorNested } from './PaginatorNested';
 interface PaperNestedProps {
   children: React.ReactNode;
+  pageWidth: number;
 }
 
-export function PaperNested({ children }: PaperNestedProps): JSX.Element {
+export function PaperNested({ children, pageWidth = 0.6 }: PaperNestedProps): JSX.Element {
   const structure = React.useMemo(() => {
     const columnCount = React.Children.toArray(children).length;
     const tempStructure: Structure = Array.from({ length: columnCount }, () => []);
@@ -48,5 +49,5 @@ export function PaperNested({ children }: PaperNestedProps): JSX.Element {
     return tempStructure;
   }, [children]);
 
-  return <PaginatorNested structure={structure} />;
+  return <PaginatorNested structure={structure} pageWidth={pageWidth} />;
 }
