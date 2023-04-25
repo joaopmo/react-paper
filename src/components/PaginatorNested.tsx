@@ -1,101 +1,66 @@
 /* eslint-disable  @typescript-eslint/no-non-null-assertion */
 import React from 'react';
-import { DimensionProvider } from './Dimension';
-import { Page } from './Page';
-import { getStyle, get, zip, debounce } from '../utils';
+import { useColumnsMap, SubscribersContext, type State } from './Paginator';
 import {
-  type Style,
-  type Subscribe,
+  type Path,
+  type Schema,
   type SchemaColumn,
   type SchemaPage,
-  type Schema,
   type Structure,
   type StructureField,
-  type Path,
+  type Style,
 } from '../types';
-import { type Node } from './PaginatorNested';
-export interface SubContextObject {
-  subNode: Subscribe | null;
-  subField: Subscribe | null;
-  subColumn: Subscribe | null;
+import { debounce, get, getStyle } from '../utils';
+
+export interface Node {
+  path: Path;
+  children: number;
+  content: 'block' | 'text';
+  element: Element;
 }
 
-export const SubscribersContext = React.createContext<SubContextObject>({
-  subNode: null,
-  subField: null,
-  subColumn: null,
-});
-
-export function useSubscribers(): SubContextObject {
-  return React.useContext(SubscribersContext);
-}
-
-interface PaginatorProps {
-  structure: Structure;
-  pageWidth: number;
-}
-
-export interface State {
-  currPath: Path;
-  prevPath: Path;
-  leadPage: number;
-  currSlice: number;
-  upperBound: number;
-  lowerBound: number;
-  addedHeight: number;
-  freeHeight: number;
-  field: StructureField | Node;
-  style: Style<number>;
-  prevSibEl?: Element;
-  nextSibEl?: Element;
-}
-
-function useElementPathMap() {
-  const elementToPath = React.useRef<Map<Element, Path>>(new Map());
-  const pathToElement = React.useRef<Map<string, Element>>(new Map());
+function useNodePathMap() {
+  const elementToNode = React.useRef<Map<Element, Node>>(new Map());
+  const pathToNode = React.useRef<Map<string, Node>>(new Map());
 
   return React.useMemo(() => {
     return {
-      set(keyOne: Element, keyTwo: Path) {
-        pathToElement.current.set(keyTwo.join('.'), keyOne);
-        elementToPath.current.set(keyOne, keyTwo);
+      set(node: Node) {
+        pathToNode.current.set(node.path.join('.'), node);
+        elementToNode.current.set(node.element, node);
+
+        const parentNode = this.get(node.path.slice(0, -1));
+        if (parentNode == null) return;
+        parentNode.children++;
       },
       get(key: Element | Path) {
-        if (Array.isArray(key)) return pathToElement.current.get(key.join('.'));
-        if (key instanceof Element) return elementToPath.current.get(key);
+        if (Array.isArray(key)) return pathToNode.current.get(key.join('.'));
+        if (key instanceof Element) return elementToNode.current.get(key);
       },
-      delete(keyOne: Element, keyTwo: Path) {
-        pathToElement.current.delete(keyTwo.join('.'));
-        elementToPath.current.delete(keyOne);
+      delete(key: Element | Path) {
+        const node = this.get(key);
+        if (node == null) return;
+        pathToNode.current.delete(node.path.join('.'));
+        elementToNode.current.delete(node.element);
+
+        const parentNode = this.get(node.path.slice(0, -1));
+        if (parentNode == null) return;
+        parentNode.children--;
       },
     };
   }, []);
 }
 
-export function useColumnsMap() {
-  const columnsMap = React.useRef<Map<number, Element>>(new Map());
-
-  return React.useMemo(() => {
-    return {
-      set(idx: number, ref: Element) {
-        columnsMap.current.set(idx, ref);
-      },
-      get(idx: number) {
-        return columnsMap.current.get(idx);
-      },
-      delete(idx: number) {
-        return columnsMap.current.delete(idx);
-      },
-    };
-  }, []);
+interface PaginatorNestedProps {
+  structure: Structure;
 }
 
-export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element {
+export function PaginatorNested({ structure }: PaginatorNestedProps) {
   const COLUMN = 0;
-  const ROOT_FIELD = 1;
+  const ROOT_NODE = 1;
   const [loading, setLoading] = React.useState(true);
-  const fieldsMap = useElementPathMap();
   const columnsMap = useColumnsMap();
+  const nodesMap = useNodePathMap();
 
   function reducer(
     state: Schema,
@@ -121,15 +86,15 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
     let slice = 0;
 
     while (pageIt < column.length && sliceIt >= 0) {
-      if (column[pageIt][sliceIt].path[ROOT_FIELD] === fieldIndex) {
+      if (column[pageIt][sliceIt].path[ROOT_NODE] === fieldIndex) {
         page = column[pageIt][sliceIt].leadPage;
         slice = column[page].findIndex((value) => {
-          return value.path[ROOT_FIELD] === fieldIndex;
+          return value.path[ROOT_NODE] === fieldIndex;
         });
         return [page, slice];
       }
 
-      if (column[pageIt][sliceIt].path[1] < fieldIndex) {
+      if (column[pageIt][sliceIt].path[ROOT_NODE] < fieldIndex) {
         pageIt++;
       } else {
         sliceIt--;
@@ -219,28 +184,25 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
         lowerBound: 0,
         addedHeight,
         freeHeight,
-        style: getStyle(fieldsMap.get(path) as Element),
-        field: get(structure, path) as StructureField,
+        style: getStyle((nodesMap.get(path) as Node).element),
+        field: nodesMap.get(path) as Node,
       };
 
       const pathStack: Path[] = [];
-      for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_FIELD]; i--) {
+      for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_NODE]; i--) {
         pathStack.push([path[COLUMN], i]);
       }
 
       while (pathStack.length > 0) {
         state.currPath = pathStack.pop()!;
         const parent = state.currPath.slice(0, -1);
-        state.style = getStyle(fieldsMap.get(state.currPath) as Element);
+        state.style = getStyle((nodesMap.get(state.currPath) as Node).element);
 
         state.field = get(structure, state.currPath) as StructureField;
         state.prevSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! - 1]) as Element;
         state.nextSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! + 1]) as Element;
 
-        if (
-          state.prevPath.length > 0 &&
-          state.prevPath[ROOT_FIELD] !== state.currPath[ROOT_FIELD]
-        ) {
+        if (state.prevPath.length > 0 && state.prevPath[ROOT_NODE] !== state.currPath[ROOT_NODE]) {
           state.currSlice = 0;
           state.upperBound = state.style.marginTop;
           state.lowerBound = state.style.marginTop;
@@ -287,7 +249,7 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
 
       return column;
     },
-    [findSlice, columnsMap, fieldsMap, structure, boxOverflow],
+    [findSlice, columnsMap, structure, boxOverflow],
   );
 
   const calcPosition = React.useCallback(
@@ -325,31 +287,27 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
     return schema;
   });
 
-  const resizeHandler = React.useCallback(
-    (entries: ResizeObserverEntry[]) => {
-      // Column to the path of its first resized field
-      const leadChanges = entries.reduce((acc, { target: el }) => {
-        const potentialPath = fieldsMap.get(el) as Path;
-        const availablePath = acc.get(potentialPath[COLUMN]);
+  const resizeHandler = React.useCallback((entries: ResizeObserverEntry[]) => {
+    const leadChanges = entries.reduce((acc, { target: el }) => {
+      const potentialPath = (nodesMap.get(el) as Node).path;
+      const availablePath = acc.get(potentialPath[COLUMN]);
 
-        if (availablePath !== undefined) {
-          if (potentialPath[ROOT_FIELD] < availablePath[ROOT_FIELD]) {
-            acc.set(potentialPath[COLUMN], potentialPath.slice(0, 2));
-          }
-          return acc;
+      if (availablePath !== undefined) {
+        if (potentialPath[ROOT_NODE] < availablePath[ROOT_NODE]) {
+          acc.set(potentialPath[COLUMN], potentialPath.slice(0, 2));
         }
-
-        acc.set(potentialPath[COLUMN], potentialPath.slice(0, 2));
-
         return acc;
-      }, new Map<number, Path>());
+      }
 
-      setLoading(true);
-      dispatch({ type: 'resize', payload: { leadChanges } });
-      setLoading(false);
-    },
-    [fieldsMap],
-  );
+      acc.set(potentialPath[COLUMN], potentialPath.slice(0, 2));
+
+      return acc;
+    }, new Map<number, Path>());
+
+    setLoading(true);
+    dispatch({ type: 'resize', payload: { leadChanges } });
+    setLoading(false);
+  }, []);
 
   const debouncedResizeHandler = React.useMemo(() => {
     return debounce(resizeHandler, 50, true);
@@ -359,26 +317,24 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
     const resize = new ResizeObserver(debouncedResizeHandler);
 
     return {
-      observe(el: Element, path: Path) {
-        fieldsMap.set(el, path);
-        if (path.length === 2) {
-          resize.observe(el, { box: 'border-box' });
+      observe(node: Node) {
+        nodesMap.set(node);
+        if (node.path.length === 2) {
+          resize.observe(node.element, { box: 'border-box' });
         }
       },
-      unobserve(el: Element, path: Path) {
-        fieldsMap.delete(el, path);
-        if (path.length === 2) {
-          resize.unobserve(el);
-        }
+      unobserve(el: Element) {
+        nodesMap.delete(el);
+        resize.unobserve(el);
       },
     };
-  }, [debouncedResizeHandler, fieldsMap]);
+  }, [debouncedResizeHandler]);
 
-  const subField = React.useCallback(
-    (ref: Element, path: Path) => {
-      observer.observe(ref, path);
+  const subNode = React.useCallback(
+    (node: Node) => {
+      observer.observe(node);
       return function unsubscribe() {
-        observer.unobserve(ref, path);
+        observer.unobserve(node.element);
       };
     },
     [observer],
@@ -395,27 +351,9 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
     [columnsMap],
   );
 
-  React.useEffect(() => {
-    dispatch({ type: 'resize', payload: {} });
-  }, [dispatch]);
-
   return (
-    <SubscribersContext.Provider value={{ subField, subColumn, subNode: null }}>
-      <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
-        <div className="rp-container">
-          {zip(schema).map((columns: Array<SchemaPage | null>, index) => {
-            return (
-              <Page
-                columns={columns}
-                structure={structure}
-                index={index}
-                loading={loading}
-                key={index}
-              />
-            );
-          })}
-        </div>
-      </DimensionProvider>
+    <SubscribersContext.Provider value={{ subNode, subColumn, subField: null }}>
+      HW
     </SubscribersContext.Provider>
   );
 }
