@@ -28,7 +28,6 @@ export function PaperNested({ children, pageWidth = 0.6 }: PaperNestedProps): JS
             return;
           }
           case Node: {
-            console.log(child.props);
             return tempStructure[columnIndex].push({
               element: child.props.element ?? null,
               content: child.props.content ?? 'text',
