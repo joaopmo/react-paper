@@ -27,12 +27,14 @@ export function PaperNested({ children, pageWidth = 0.6 }: PaperNestedProps): JS
             iterate(child.props.children, columnIndex);
             return;
           }
-          case Node:
+          case Node: {
+            console.log(child.props);
             return tempStructure[columnIndex].push({
               element: child.props.element ?? null,
               content: child.props.content ?? 'text',
               children: null,
             });
+          }
           default:
             assert(
               false,

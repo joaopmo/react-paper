@@ -49,10 +49,6 @@ export function DimensionProvider({
 
   const resizeHandler = React.useCallback(() => {
     // A4 = 297mm x 210mm
-
-    const mm = getComputedStyle(document.body).getPropertyValue('--mm');
-    console.log('mm: ', mm);
-
     const height = 297 * multiplier;
     const width = 210 * multiplier;
     const container = dimensionRef.current;

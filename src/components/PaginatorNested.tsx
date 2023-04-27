@@ -2,53 +2,124 @@
 import React from 'react';
 import { useColumnsMap, SubscribersContext, type State } from './Paginator';
 import { DimensionProvider } from './Dimension';
-import { zip } from '../utils';
-import { Page } from './Page';
+import { zip, debounce, getStyle } from '../utils';
+import { PageNested } from './PageNested';
 import {
   type Path,
   type Schema,
   type SchemaColumn,
   type SchemaPage,
   type Structure,
-  type StructureField,
   type Style,
 } from '../types';
-import { debounce, get, getStyle } from '../utils';
 
 export interface Node {
   path: Path;
   children: number;
-  content: 'block' | 'text';
+  content: 'block' | 'text' | null;
   element: Element;
 }
 
 function useNodePathMap() {
-  const elementToNode = React.useRef<Map<Element, Node>>(new Map());
+  // const elementToNode = React.useRef<Map<Element, Node>>(new Map());
   const pathToNode = React.useRef<Map<string, Node>>(new Map());
+  const pathToChildren = React.useRef<Map<string, number>>(new Map());
 
   return React.useMemo(() => {
     return {
       set(node: Node) {
         pathToNode.current.set(node.path.join('.'), node);
-        elementToNode.current.set(node.element, node);
+        // elementToNode.current.set(node.element, node);
 
-        const parentNode = this.get(node.path.slice(0, -1));
-        if (parentNode == null) return;
-        parentNode.children++;
+        const childCount = pathToChildren.current.get(node.path.join('.'));
+        if (childCount === undefined) {
+          pathToChildren.current.set(node.path.join('.'), 0);
+        }
+
+        for (let i = node.path.length - 1; i > 0; i--) {
+          let parentChildCount = pathToChildren.current.get(node.path.slice(0, i).join('.'));
+
+          if (parentChildCount === undefined && childCount === undefined) {
+            pathToChildren.current.set(node.path.slice(0, i).join('.'), 1);
+            continue;
+          }
+
+          if (parentChildCount !== undefined && childCount === undefined) {
+            pathToChildren.current.set(node.path.slice(0, i).join('.'), ++parentChildCount);
+          }
+          break;
+        }
       },
       get(key: Element | Path) {
-        if (Array.isArray(key)) return pathToNode.current.get(key.join('.'));
-        if (key instanceof Element) return elementToNode.current.get(key);
-      },
-      delete(key: Element | Path) {
-        const node = this.get(key);
-        if (node == null) return;
-        pathToNode.current.delete(node.path.join('.'));
-        elementToNode.current.delete(node.element);
+        if (Array.isArray(key)) {
+          const children = pathToChildren.current.get(key.join('.'));
+          const node = pathToNode.current.get(key.join('.'));
+          if (children !== undefined && node !== undefined) {
+            return {
+              ...node,
+              children,
+            };
+          }
+          return node;
+        }
 
-        const parentNode = this.get(node.path.slice(0, -1));
-        if (parentNode == null) return;
-        parentNode.children--;
+        if (key instanceof Element) {
+          for (const node of pathToNode.current.values()) {
+            if (
+              node.element.isEqualNode(key) ||
+              node.element === key ||
+              node.element.getAttribute('data-id') === key.getAttribute('data-id')
+            ) {
+              const children = pathToChildren.current.get(node.path.join('.'));
+              if (children !== undefined) {
+                return {
+                  ...node,
+                  children,
+                };
+              }
+              return node;
+            }
+          }
+
+          return undefined;
+
+          // const node = elementToNode.current.get(key);
+          // if (node !== undefined) {
+          //   const children = pathToChildren.current.get(node.path.join('.'));
+          //   if (children !== undefined)
+          //     return {
+          //       ...node,
+          //       children,
+          //     };
+          // }
+          //
+          // return node;
+        }
+      },
+      has(path: Path) {
+        return pathToNode.current.has(path.join('.'));
+      },
+      delete(node: Node) {
+        pathToNode.current.delete(node.path.join('.'));
+        // elementToNode.current.delete(node.element);
+
+        const childDeleted = pathToChildren.current.delete(node.path.join('.'));
+        let parentChildCount = pathToChildren.current.get(node.path.slice(0, -1).join('.'));
+        if (parentChildCount !== undefined && childDeleted) {
+          pathToChildren.current.set(node.path.slice(0, -1).join('.'), --parentChildCount);
+        }
+      },
+      log() {
+        pathToNode.current.forEach((value, key) => {
+          console.log(
+            key,
+            JSON.stringify(
+              { path: value.path, content: value.content, children: value.children },
+              null,
+              2,
+            ),
+          );
+        });
       },
     };
   }, []);
@@ -128,6 +199,13 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
+        // if (state.field.content === 'block') {
+        //   console.log(box);
+        //   console.log(currentBox);
+        //   console.log(state);
+        //   console.log('\n\n');
+        // }
+
         if (state.freeHeight >= currentBox) {
           state.lowerBound = state.lowerBound + currentBox;
           state.addedHeight = state.addedHeight + currentBox;
@@ -200,11 +278,17 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
       while (pathStack.length > 0) {
         state.currPath = pathStack.pop()!;
         const parent = state.currPath.slice(0, -1);
+
         state.style = getStyle((nodesMap.get(state.currPath) as Node).element);
 
+        // console.log(state.currPath);
+        // console.log(state.style);
+        // console.log(nodesMap.get(state.currPath));
+        // console.log('\n');
+
         state.field = nodesMap.get(state.currPath) as Node;
-        state.prevSibEl = (nodesMap.get([...parent, state.currPath.at(-1)! - 1]) as Node).element;
-        state.nextSibEl = (nodesMap.get([...parent, state.currPath.at(-1)! + 1]) as Node).element;
+        state.prevSibEl = nodesMap.get([...parent, state.currPath.at(-1)! - 1])?.element;
+        state.nextSibEl = nodesMap.get([...parent, state.currPath.at(-1)! + 1])?.element;
 
         if (state.prevPath.length > 0 && state.prevPath[ROOT_NODE] !== state.currPath[ROOT_NODE]) {
           state.currSlice = 0;
@@ -212,14 +296,17 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
           state.lowerBound = state.style.marginTop;
         }
 
+        // if (state.field.content === 'block') {
+        // }
+
         if (state.prevPath.length <= state.currPath.length) {
           boxOverflow(state, page, column, 'marginTop');
           boxOverflow(state, page, column, 'borderTop');
           boxOverflow(state, page, column, 'paddingTop');
 
-          if (state.field.children != null) {
+          if (state.field.children !== 0 && state.field.content !== 'block') {
             pathStack.push([...state.currPath]);
-            for (let i = state.field.children; i >= 0; i--) {
+            for (let i = state.field.children - 1; i >= 0; i--) {
               pathStack.push([...state.currPath, i]);
             }
             state.prevPath = [...state.currPath];
@@ -327,9 +414,9 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
           resize.observe(node.element, { box: 'border-box' });
         }
       },
-      unobserve(el: Element) {
-        nodesMap.delete(el);
-        resize.unobserve(el);
+      unobserve(node: Node) {
+        nodesMap.delete(node);
+        resize.unobserve(node.element);
       },
     };
   }, [debouncedResizeHandler]);
@@ -338,7 +425,7 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
     (node: Node) => {
       observer.observe(node);
       return function unsubscribe() {
-        observer.unobserve(node.element);
+        observer.unobserve(node);
       };
     },
     [observer],
@@ -355,13 +442,18 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
     [columnsMap],
   );
 
+  React.useEffect(() => {
+    console.log('useEffect Main');
+    dispatch({ type: 'resize', payload: {} });
+  }, [dispatch]);
+
   return (
     <SubscribersContext.Provider value={{ subNode, subColumn, subField: null }}>
       <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
         <div className="rp-container">
           {zip(schema).map((columns: Array<SchemaPage | null>, index) => {
             return (
-              <Page
+              <PageNested
                 columns={columns}
                 structure={structure}
                 index={index}

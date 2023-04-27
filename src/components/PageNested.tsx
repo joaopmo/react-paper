@@ -1,13 +1,13 @@
 import React from 'react';
 import { useDimension } from './Dimension';
 import { useSubscribers } from './Paginator';
-import { renderWithOutlet } from './Outlet';
+import { LevelProvider } from './Level';
 import { get } from '../utils';
 import { Backdrop } from './Backdrop';
 import { Spinner } from './Spinner';
 import { type SchemaPage, type Structure, type StructureField } from '../types';
 
-interface PageProps {
+interface PageNestedProps {
   structure: Structure;
   columns: Array<SchemaPage | null>;
   index: number;
@@ -44,18 +44,19 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
         const calcHeight = slice.lowerBound - slice.upperBound;
         const maxHeight = calcHeight !== 0 ? calcHeight : 'none';
         const top = -slice.upperBound;
-
         return (
           <div
-            key={`${slice.current}.${slice.path.join('.')}`}
             style={{ overflow: 'hidden', maxHeight }}
+            key={`${slice.current}.${slice.path.join('.')}`}
           >
             <div style={{ position: 'relative', top }}>
-              {renderWithOutlet(
-                get(structure, slice.path) as StructureField,
-                slice.path,
-                slice.current === 0,
-              )}
+              <LevelProvider
+                path={slice.path}
+                content={(get(structure, slice.path) as StructureField).content ?? 'text'}
+                subscribe={slice.current === 0}
+              >
+                {(get(structure, slice.path) as StructureField).element}
+              </LevelProvider>
             </div>
           </div>
         );
@@ -64,7 +65,12 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
   );
 }
 
-export function Page({ columns, structure, index, loading }: PageProps): JSX.Element {
+export const PageNested = React.memo(function PageNested({
+  columns,
+  structure,
+  index,
+  loading,
+}: PageNestedProps): JSX.Element {
   const { scale, ...dimension } = useDimension();
 
   return (
@@ -91,4 +97,4 @@ export function Page({ columns, structure, index, loading }: PageProps): JSX.Ele
       })}
     </div>
   );
-}
+});

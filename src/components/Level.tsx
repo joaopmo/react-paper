@@ -3,47 +3,70 @@ import { assert } from '../utils';
 import { Node } from './Node';
 import { useSubscribers } from './Paginator';
 import { type Path } from '../types';
+
+export interface Register {
+  ref: ((arg: Element | null) => void) | null;
+  'data-id': string;
+}
 interface LevelContextObject {
-  reference: ((arg: Element | null) => void) | null;
+  register: () => Register;
   path: Path;
+  subscribe: boolean;
 }
 
-export const LevelContext = React.createContext<LevelContextObject>({
-  reference: null,
+const LevelContext = React.createContext<LevelContextObject>({
+  register: () => ({ ref: null, 'data-id': '' }),
   path: [],
+  subscribe: false,
 });
 
-export function usePath() {
-  return React.useContext(LevelContext).path;
+function useLevelContext() {
+  return React.useContext(LevelContext);
 }
 
-interface PathProviderProps {
+export function useRegister() {
+  return React.useContext(LevelContext).register;
+}
+
+interface LevelProviderProps {
   path: Path;
-  children: JSX.Element;
-  subscribe: boolean;
+  children: React.ReactNode;
   content: 'block' | 'text' | null;
+  subscribe: boolean;
 }
 
-export function LevelProvider({ path, children, content, subscribe }: PathProviderProps) {
+export function LevelProvider({ path, children, content, subscribe }: LevelProviderProps) {
   const [ref, setRef] = React.useState<Element | null>(null);
+
+  // console.log('LevelProvider', path);
 
   const { subNode } = useSubscribers();
 
   React.useLayoutEffect(() => {
-    if (ref != null && subNode != null)
+    if (ref != null && subNode != null) {
       return subNode({ path, children: 0, content: content ?? 'text', element: ref });
+    }
   }, [path, ref, subNode]);
 
   const reference = React.useCallback(
     (el: Element | null) => {
-      if (el != null && el !== ref && subscribe) {
+      if (el != null && !el.isEqualNode(ref) && subscribe) {
         setRef(el);
       }
     },
-    [ref, subscribe],
+    [ref],
   );
 
-  return <LevelContext.Provider value={{ reference, path }}>{children}</LevelContext.Provider>;
+  const register = React.useCallback((): Register => {
+    return {
+      ref: reference,
+      'data-id': path.join('.'),
+    };
+  }, [reference]);
+
+  return (
+    <LevelContext.Provider value={{ register, path, subscribe }}>{children}</LevelContext.Provider>
+  );
 }
 
 interface LevelProps {
@@ -51,11 +74,12 @@ interface LevelProps {
 }
 
 export function Level({ children }: LevelProps) {
-  const parentPath = usePath();
+  // const parentPath = usePath();
+  const { path: parentPath, subscribe } = useLevelContext();
 
-  return React.Children.map(children, (child, index) => {
+  const nodes = React.Children.map(children, (child, index) => {
     if (!React.isValidElement(child)) {
-      return;
+      return null;
     }
 
     assert(
@@ -69,10 +93,12 @@ export function Level({ children }: LevelProps) {
       <LevelProvider
         path={[...parentPath, index]}
         content={child.props.content}
-        subscribe={parentPath.length === 1}
+        subscribe={subscribe}
       >
         {child.props.element}
       </LevelProvider>
     );
   });
+
+  return <>{nodes ?? null}</>;
 }
