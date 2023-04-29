@@ -42,15 +42,15 @@ const Text = function Content({ children }: { children?: React.ReactNode }) {
   );
 };
 
-// const images = [
-//   'https://images4.alphacoders.com/973/973967.jpg',
-//   'https://images4.alphacoders.com/993/993395.jpg',
-//   'https://images.alphacoders.com/919/919248.jpg',
-//   'https://images4.alphacoders.com/920/920077.jpg',
-//   'https://images.alphacoders.com/172/172203.jpg',
-// ];
+const images = [
+  'https://images4.alphacoders.com/973/973967.jpg',
+  'https://images4.alphacoders.com/993/993395.jpg',
+  'https://images.alphacoders.com/919/919248.jpg',
+  'https://images4.alphacoders.com/920/920077.jpg',
+  'https://images.alphacoders.com/172/172203.jpg',
+];
 
-// const link = images[getRandomInt(4)];
+const link = images[getRandomInt(4)];
 
 const height = `${getRandomInt(150)}px`;
 console.log(height);
@@ -59,16 +59,17 @@ function Image() {
   const register = useRegister();
 
   return (
-    <div
-      {...register()}
+    <img
+      src={link}
+      alt="Image"
       style={{
         ...style,
-        height,
-        background: 'blue',
+        width: '100%',
         borderTop: '8px solid red',
         borderBottom: '8px solid green',
       }}
-    ></div>
+      {...register()}
+    />
   );
 }
 

@@ -2,7 +2,7 @@
 import React from 'react';
 import { DimensionProvider } from './Dimension';
 import { Page } from './Page';
-import { getStyle, get, zip, debounce } from '../utils';
+import { getStyle, get, zip, debounce, assert } from '../utils';
 import {
   type Style,
   type Subscribe,
@@ -166,6 +166,14 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
           break;
         }
 
+        if (box === 'borderBox') {
+          const pageHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!).contentBox;
+          assert(
+            currentBox <= pageHeight,
+            'A <Field> of with content prop = block received a element with height greater than the page',
+          );
+        }
+
         if (
           box === 'contentBox' &&
           state.field.content === 'text' &&
@@ -248,23 +256,30 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
 
         if (state.prevPath.length <= state.currPath.length) {
           boxOverflow(state, page, column, 'marginTop');
-          boxOverflow(state, page, column, 'borderTop');
-          boxOverflow(state, page, column, 'paddingTop');
 
-          if (state.field.children != null) {
-            pathStack.push([...state.currPath]);
-            for (let i = state.field.children.length - 1; i >= 0; i--) {
-              pathStack.push([...state.currPath, i]);
+          if (state.field.content !== 'block') {
+            boxOverflow(state, page, column, 'borderTop');
+            boxOverflow(state, page, column, 'paddingTop');
+
+            if (state.field.children != null) {
+              pathStack.push([...state.currPath]);
+              for (let i = state.field.children.length - 1; i >= 0; i--) {
+                pathStack.push([...state.currPath, i]);
+              }
+              state.prevPath = [...state.currPath];
+              continue;
             }
-            state.prevPath = [...state.currPath];
-            continue;
-          }
 
-          boxOverflow(state, page, column, 'contentBox');
+            boxOverflow(state, page, column, 'contentBox');
+          } else {
+            boxOverflow(state, page, column, 'borderBox');
+          }
         }
 
-        boxOverflow(state, page, column, 'paddingBottom');
-        boxOverflow(state, page, column, 'borderBottom');
+        if (state.field.content !== 'block') {
+          boxOverflow(state, page, column, 'paddingBottom');
+          boxOverflow(state, page, column, 'borderBottom');
+        }
         boxOverflow(state, page, column, 'marginBottom');
 
         if (state.currPath.length === 2) {

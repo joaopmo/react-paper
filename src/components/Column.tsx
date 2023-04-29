@@ -1,7 +1,8 @@
+import React from 'react'; // eslint-disable-line
 import { assert } from '../utils';
 
 interface ColumnProps {
-  children: JSX.Element;
+  children: React.ReactNode;
 }
 export function Column(props: ColumnProps): JSX.Element {
   assert(

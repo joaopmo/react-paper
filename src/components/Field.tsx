@@ -3,7 +3,7 @@ import { assert } from '../utils';
 interface FieldProps {
   element: JSX.Element;
   content?: 'block' | 'text';
-  children?: JSX.Element;
+  children?: React.ReactNode;
 }
 
 export function Field(props: FieldProps): JSX.Element {

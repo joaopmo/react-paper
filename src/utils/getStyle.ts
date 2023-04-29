@@ -3,6 +3,7 @@ import { type Style } from '../types';
 const properties: Style<string> = {
   borderBox: 'height',
   contentBox: 'height',
+  marginBox: 'height',
   fontSize: 'font-size',
   lineHeight: 'line-height',
   marginTop: 'margin-top',
@@ -24,9 +25,13 @@ export const getStyle = (el: Element): Style<number> => {
   if (style.getPropertyValue('box-sizing') === 'border-box') {
     sizes.contentBox -= sizes.paddingTop + sizes.paddingBottom;
     sizes.contentBox -= sizes.borderTop + sizes.borderBottom;
+    sizes.marginBox += sizes.marginTop + sizes.marginBottom;
   } else {
     sizes.borderBox += sizes.paddingTop + sizes.paddingBottom;
     sizes.borderBox += sizes.borderTop + sizes.borderBottom;
+    sizes.marginBox += sizes.paddingTop + sizes.paddingBottom;
+    sizes.marginBox += sizes.borderTop + sizes.borderBottom;
+    sizes.marginBox += sizes.marginTop + sizes.marginBottom;
   }
 
   return sizes;

@@ -3,7 +3,7 @@ import { NestedPaper } from '../stories/NestedPaper';
 import { StructPaper } from '../stories/StructPaper';
 
 const App = () => {
-  return <NestedPaper />;
+  return <StructPaper />;
 };
 
 export default App;
