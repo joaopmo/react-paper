@@ -25,30 +25,29 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
   const [ref, setRef] = React.useState<Element | null>(null);
   const { subColumn } = useSubscribers();
 
-  React.useLayoutEffect(() => {
-    if (ref != null && subColumn != null) return subColumn(ref, [pageIndex, columnIndex]);
-  }, [columnIndex, pageIndex, ref, subColumn]);
+  // React.useLayoutEffect(() => {
+  //   if (ref != null && subColumn != null) return subColumn(ref, [pageIndex, columnIndex]);
+  // }, [columnIndex, pageIndex, ref, subColumn]);
 
   const reference = React.useCallback(
     (el: Element | null) => {
-      if (el != null && el !== ref && pageIndex === 0) {
-        setRef(el);
+      if (el != null && pageIndex === 0 && subColumn != null) {
+        // setRef(el);
+        subColumn(el, [pageIndex, columnIndex]);
       }
     },
-    [pageIndex, ref],
+    [pageIndex],
   );
 
   return (
     <div className={`rp-column rp-column-${columnIndex}`} ref={reference}>
       {column?.map((slice) => {
-        const calcHeight = slice.lowerBound - slice.upperBound;
-        const maxHeight = calcHeight !== 0 ? calcHeight : 'none';
+        const height = slice.lowerBound - slice.upperBound;
+        const maxHeight = slice.lowerBound === 0 && slice.upperBound === 0 ? 'none' : height;
         const top = -slice.upperBound;
+
         return (
-          <div
-            style={{ overflow: 'hidden', maxHeight }}
-            key={`${slice.current}.${slice.path.join('.')}`}
-          >
+          <div style={{ overflow: 'hidden', maxHeight }} key={`${slice.path.join('.')}`}>
             <div style={{ position: 'relative', top }}>
               <LevelProvider
                 path={slice.path}

@@ -1,9 +1,10 @@
-import { type Style } from '../types';
+import { type Style, type PartialStyle } from '../types';
 
-const properties: Style<string> = {
+const properties: PartialStyle<string> = {
   borderBox: 'height',
   contentBox: 'height',
   marginBox: 'height',
+  rowGap: 'row-gap',
   fontSize: 'font-size',
   lineHeight: 'line-height',
   marginTop: 'margin-top',
@@ -16,11 +17,19 @@ const properties: Style<string> = {
 export const getStyle = (el: Element): Style<number> => {
   const style = window.getComputedStyle(el);
 
-  const sizes = Object.entries(properties).reduce<Style<number>>((acc, [key, val]) => {
-    const valIsNan = Number.isNaN(parseFloat(style.getPropertyValue(val)));
-    acc[key as keyof Style<number>] = valIsNan ? 0 : parseFloat(style.getPropertyValue(val));
-    return acc;
-  }, {} as Style<number>); // eslint-disable-line
+  const partialSizes = Object.entries(properties).reduce<PartialStyle<number>>(
+    (acc, [key, val]) => {
+      const valIsNan = Number.isNaN(parseFloat(style.getPropertyValue(val)));
+      acc[key as keyof PartialStyle<number>] = valIsNan
+        ? 0
+        : parseFloat(style.getPropertyValue(val));
+      return acc;
+    },
+    // eslint-disable-next-line
+    {} as PartialStyle<number>,
+  );
+
+  const sizes: Style<number> = { ...partialSizes, display: style.getPropertyValue('display') };
 
   if (style.getPropertyValue('box-sizing') === 'border-box') {
     sizes.contentBox -= sizes.paddingTop + sizes.paddingBottom;

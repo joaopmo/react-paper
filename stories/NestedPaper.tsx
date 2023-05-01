@@ -5,39 +5,37 @@ import { PaperNested } from '../src/components/PaperNested';
 import { Column } from '../src';
 import { Node } from '../src/components/Node';
 import '../src/styles/base.css';
+import '../src/styles/print.css';
 
 function getRandomInt(max: number) {
   return Math.floor(Math.random() * max);
 }
 
-const text = loremIpsum({ count: 30, units: 'paragraphs' });
+const text = loremIpsum({ count: 15, units: 'paragraphs' });
+const text2 = loremIpsum({ count: 1, units: 'sentences' });
 const style = {
   marginTop: `${getRandomInt(10)}px`,
   marginBottom: `${getRandomInt(10)}px`,
   paddingTop: `${getRandomInt(10)}px`,
   paddingBottom: `${getRandomInt(10)}px`,
-  borderTop: '2px solid red',
-  borderBottom: '2px solid green',
 };
 
 const Text = function Content({ children }: { children?: React.ReactNode }) {
-  // const text = React.useMemo(() => loremIpsum({ count: 30, units: 'paragraphs' }), []);
-  // const style = React.useMemo(() => {
-  //   return {
-  //     marginTop: `${getRandomInt(10)}px`,
-  //     marginBottom: `${getRandomInt(10)}px`,
-  //     paddingTop: `${getRandomInt(10)}px`,
-  //     paddingBottom: `${getRandomInt(10)}px`,
-  //     borderBottom: '2px solid green',
-  //   };
-  // }, []);
-  // if (children === undefined) console.log(text, '\n\n');
+  const [internalText, setInternalText] = React.useState(text);
+
+  React.useEffect(() => {
+    setTimeout(() => {
+      setInternalText((prevText) => {
+        return prevText + ' ' + text2;
+      });
+    }, 5000);
+  }, []);
 
   const register = useRegister();
 
   return (
     <div {...register()} style={style}>
-      {children ?? text}
+      {children ?? internalText}
     </div>
   );
 };
@@ -52,28 +50,35 @@ const images = [
 
 const link = images[getRandomInt(4)];
 
-const height = `${getRandomInt(150)}px`;
-console.log(height);
-
 function Image() {
   const register = useRegister();
 
   return (
-    <img
-      src={link}
-      alt="Image"
-      style={{
-        ...style,
-        width: '100%',
-        borderTop: '8px solid red',
-        borderBottom: '8px solid green',
-      }}
+    <div
+      style={{ ...style, borderTop: '8px solid red', borderBottom: '8px solid green' }}
       {...register()}
-    />
+    >
+      <img
+        src={link}
+        alt="Image"
+        style={{
+          width: '100%',
+          height: '250px',
+        }}
+      />
+    </div>
   );
 }
 
 export const NestedPaper = () => {
+  const [firstText, setFirstText] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    setTimeout(() => {
+      setFirstText(true);
+    }, 3000);
+  }, []);
+
   return (
     <PaperNested pageWidth={0.7}>
       <Column>
@@ -89,7 +94,7 @@ export const NestedPaper = () => {
                       <Text>
                         <Level>
                           {/* 0.0.0.0 */}
-                          <Node element={<Text />} />
+                          {firstText && <Node element={<Text />} />}
                           {/* 0.0.0.1 */}
                           <Node element={<Image />} content="block" />
                           {/* 0.0.0.2 */}

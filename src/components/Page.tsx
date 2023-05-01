@@ -42,13 +42,15 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
     <div className={`rp-column rp-column-${columnIndex}`} ref={reference}>
       {column?.map((slice) => {
         const calcHeight = slice.lowerBound - slice.upperBound;
-        const maxHeight = calcHeight !== 0 ? calcHeight : 'none';
+        const height = calcHeight !== 0 ? calcHeight : 'none';
+        const minHeight = height;
+        const maxHeight = height;
         const top = -slice.upperBound;
 
         return (
           <div
             key={`${slice.current}.${slice.path.join('.')}`}
-            style={{ overflow: 'hidden', maxHeight }}
+            style={{ overflow: 'hidden', maxHeight, minHeight }}
           >
             <div style={{ position: 'relative', top }}>
               {renderWithOutlet(

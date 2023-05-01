@@ -2,7 +2,7 @@
 import React from 'react';
 import { useColumnsMap, SubscribersContext, type State } from './Paginator';
 import { DimensionProvider } from './Dimension';
-import { zip, debounce, getStyle } from '../utils';
+import { zip, debounce, getStyle, assert } from '../utils';
 import { PageNested } from './PageNested';
 import {
   type Path,
@@ -18,17 +18,20 @@ export interface Node {
   children: number;
   content: 'block' | 'text' | null;
   element: Element;
+  prevSize: number;
 }
 
 function useNodePathMap() {
   // const elementToNode = React.useRef<Map<Element, Node>>(new Map());
   const pathToNode = React.useRef<Map<string, Node>>(new Map());
   const pathToChildren = React.useRef<Map<string, number>>(new Map());
+  const tobeDeleted = React.useRef<Map<string, Node>>(new Map());
 
-  return React.useMemo(() => {
-    return {
+  return React.useMemo(function () {
+    const operations = {
       set(node: Node) {
         pathToNode.current.set(node.path.join('.'), node);
+        tobeDeleted.current.delete(node.path.join('.'));
         // elementToNode.current.set(node.element, node);
 
         const childCount = pathToChildren.current.get(node.path.join('.'));
@@ -49,6 +52,18 @@ function useNodePathMap() {
           }
           break;
         }
+      },
+      sizeDiff(el: Element) {
+        const node = this.get(el);
+        if (node == null) return false;
+        const currSize = getStyle(el).borderBox;
+
+        if (node.prevSize !== currSize) {
+          // this.set({ ...node, prevSize: currSize });
+          return true;
+        }
+
+        return false;
       },
       get(key: Element | Path) {
         if (Array.isArray(key)) {
@@ -82,22 +97,7 @@ function useNodePathMap() {
           }
 
           return undefined;
-
-          // const node = elementToNode.current.get(key);
-          // if (node !== undefined) {
-          //   const children = pathToChildren.current.get(node.path.join('.'));
-          //   if (children !== undefined)
-          //     return {
-          //       ...node,
-          //       children,
-          //     };
-          // }
-          //
-          // return node;
         }
-      },
-      has(path: Path) {
-        return pathToNode.current.has(path.join('.'));
       },
       delete(node: Node) {
         pathToNode.current.delete(node.path.join('.'));
@@ -109,19 +109,9 @@ function useNodePathMap() {
           pathToChildren.current.set(node.path.slice(0, -1).join('.'), --parentChildCount);
         }
       },
-      log() {
-        pathToNode.current.forEach((value, key) => {
-          console.log(
-            key,
-            JSON.stringify(
-              { path: value.path, content: value.content, children: value.children },
-              null,
-              2,
-            ),
-          );
-        });
-      },
     };
+
+    return operations;
   }, []);
 }
 
@@ -137,15 +127,35 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
   const columnsMap = useColumnsMap();
   const nodesMap = useNodePathMap();
 
+  function init(schema: Schema): Schema {
+    schema = structure.map((column, columnIndex) => {
+      const page = column.map((_, fieldIndex) => {
+        return {
+          path: [columnIndex, fieldIndex],
+          current: 0,
+          leadPage: 0,
+          upperBound: 0,
+          lowerBound: 0,
+          addedHeight: 0,
+        };
+      });
+      return [page];
+    });
+
+    return schema;
+  }
+
   function reducer(
-    state: Schema,
+    prevSchema: Schema,
     { type, payload }: { type: string; payload: { leadChanges?: Map<number, Path> } },
   ) {
     const { leadChanges } = payload;
     switch (type) {
       case 'resize':
-        calcPosition(state, leadChanges);
-        return state;
+        return calcPosition(prevSchema, leadChanges);
+
+      case 'reset':
+        return init([]);
 
       default:
         throw new Error('Invalid case');
@@ -171,6 +181,7 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
 
       if (column[pageIt][sliceIt].path[ROOT_NODE] < fieldIndex) {
         pageIt++;
+        sliceIt = column[pageIt].length - 1;
       } else {
         sliceIt--;
       }
@@ -181,43 +192,42 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
 
   const boxOverflow = React.useCallback(
     (state: State, page: SchemaPage, column: SchemaColumn, box: keyof Style<number>) => {
-      let currentBox = state.style[box];
+      let currentBox = (box === 'rowGap' ? state.parentStyle[box] : state.style[box]) as number;
 
       // Logic to handle margin collapse between adjacent siblings.
       // Margin collapse between parent and descendants is handled
       // by .pb-page * { overflow: hidden; } css rule.
       // =================================================================
-      if (box === 'marginTop' && state.prevSibEl != null) {
-        currentBox = 0;
-      }
+      if (state.parentStyle.display !== 'flex') {
+        if (box === 'marginTop' && state.prevSibEl != null) {
+          currentBox = 0;
+        }
 
-      if (box === 'marginBottom' && state.nextSibEl != null) {
-        const { marginTop } = getStyle(state.nextSibEl);
-        currentBox = marginTop > currentBox ? marginTop : currentBox;
+        if (box === 'marginBottom' && state.nextSibEl != null) {
+          const { marginTop } = getStyle(state.nextSibEl);
+          currentBox = marginTop > currentBox ? marginTop : currentBox;
+        }
       }
       // =================================================================
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
-        // if (state.field.content === 'block') {
-        //   console.log(box);
-        //   console.log(currentBox);
-        //   console.log(state);
-        //   console.log('\n\n');
-        // }
-
         if (state.freeHeight >= currentBox) {
-          state.lowerBound = state.lowerBound + currentBox;
-          state.addedHeight = state.addedHeight + currentBox;
           state.freeHeight = state.freeHeight - currentBox;
+          state.addedHeight = state.addedHeight + currentBox;
+          if (box !== 'rowGap') state.lowerBound = state.lowerBound + currentBox;
           break;
         }
 
-        if (
-          box === 'contentBox' &&
-          state.field.content === 'text' &&
-          state.freeHeight >= state.style.lineHeight
-        ) {
+        if (box === 'borderBox') {
+          const pageHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!).contentBox;
+          assert(
+            currentBox <= pageHeight,
+            'A <Field> of with content prop = block received a element with height greater than the page',
+          );
+        }
+
+        if (box === 'contentBox' && state.freeHeight >= state.style.lineHeight) {
           const cap = state.freeHeight - (state.freeHeight % state.style.lineHeight);
           state.lowerBound = state.lowerBound + cap;
           state.addedHeight = state.addedHeight + cap;
@@ -225,8 +235,8 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
           currentBox = currentBox - cap;
         }
 
-        if (box === 'marginTop' && state.currPath.length === 2) {
-          state.leadPage++;
+        if (state.currSlice === 0) {
+          state.leadPage = column.length;
         }
 
         page.push({
@@ -248,24 +258,24 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
     [columnsMap],
   );
 
-  const allocateFromStructure = React.useCallback(
+  const allocate = React.useCallback(
     (path: Path, schema: Schema) => {
-      const [leadPage, sliceIdx] = findSlice(path, schema);
-      const page: SchemaPage = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
-      const column: SchemaColumn = schema[path[COLUMN]].slice(0, leadPage);
-      const { contentBox: columnHeight } = getStyle(columnsMap.get(path[COLUMN])!);
-      const addedHeight = page.at(-1)?.addedHeight ?? 0;
-      const freeHeight = columnHeight - addedHeight;
+      const page: SchemaPage = [];
+      const column: SchemaColumn = [];
+      const parentStyle = getStyle(columnsMap.get(path[COLUMN])!);
+      const addedHeight = 0;
+      const freeHeight = parentStyle.contentBox;
 
       const state: State = {
         prevPath: [],
         currPath: path,
-        leadPage,
+        leadPage: 0,
         currSlice: 0,
         upperBound: 0,
         lowerBound: 0,
         addedHeight,
         freeHeight,
+        parentStyle,
         style: getStyle((nodesMap.get(path) as Node).element),
         field: nodesMap.get(path) as Node,
       };
@@ -277,34 +287,37 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
 
       while (pathStack.length > 0) {
         state.currPath = pathStack.pop()!;
-        const parent = state.currPath.slice(0, -1);
-
+        const parentPath = state.currPath.slice(0, -1);
+        state.field = nodesMap.get(state.currPath) as Node;
         state.style = getStyle((nodesMap.get(state.currPath) as Node).element);
 
-        // console.log(state.currPath);
-        // console.log(state.style);
-        // console.log(nodesMap.get(state.currPath));
-        // console.log('\n');
+        // If currPath is a root node, then the parent is the column
+        if (parentPath.length === 1) state.parentStyle = parentStyle;
+        else state.parentStyle = getStyle((nodesMap.get(parentPath) as Node).element);
+        state.prevSibEl = nodesMap.get([...parentPath, state.currPath.at(-1)! - 1])?.element;
+        state.nextSibEl = nodesMap.get([...parentPath, state.currPath.at(-1)! + 1])?.element;
 
-        state.field = nodesMap.get(state.currPath) as Node;
-        state.prevSibEl = nodesMap.get([...parent, state.currPath.at(-1)! - 1])?.element;
-        state.nextSibEl = nodesMap.get([...parent, state.currPath.at(-1)! + 1])?.element;
+        const prevRoot = state.prevPath[ROOT_NODE];
+        const currRoot = state.currPath[ROOT_NODE];
+        const rootHasChanged = prevRoot != null && prevRoot !== currRoot;
 
-        if (state.prevPath.length > 0 && state.prevPath[ROOT_NODE] !== state.currPath[ROOT_NODE]) {
+        if (rootHasChanged) {
           state.currSlice = 0;
-          state.upperBound = state.style.marginTop;
-          state.lowerBound = state.style.marginTop;
+          if (state.parentStyle.display !== 'flex') {
+            state.upperBound = state.style.marginTop;
+            state.lowerBound = state.style.marginTop;
+          } else {
+            state.upperBound = 0;
+            state.lowerBound = 0;
+          }
         }
 
-        // if (state.field.content === 'block') {
-        // }
-
-        if (state.prevPath.length <= state.currPath.length) {
+        if (state.field.content === 'text' && state.prevPath.length <= state.currPath.length) {
           boxOverflow(state, page, column, 'marginTop');
           boxOverflow(state, page, column, 'borderTop');
           boxOverflow(state, page, column, 'paddingTop');
 
-          if (state.field.children !== 0 && state.field.content !== 'block') {
+          if (state.field.children !== 0) {
             pathStack.push([...state.currPath]);
             for (let i = state.field.children - 1; i >= 0; i--) {
               pathStack.push([...state.currPath, i]);
@@ -316,9 +329,25 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
           boxOverflow(state, page, column, 'contentBox');
         }
 
-        boxOverflow(state, page, column, 'paddingBottom');
-        boxOverflow(state, page, column, 'borderBottom');
+        if (state.field.content === 'text') {
+          boxOverflow(state, page, column, 'paddingBottom');
+          boxOverflow(state, page, column, 'borderBottom');
+        }
+
+        if (state.field.content === 'block') {
+          boxOverflow(state, page, column, 'marginTop');
+          boxOverflow(state, page, column, 'borderBox');
+        }
+
         boxOverflow(state, page, column, 'marginBottom');
+
+        if (state.parentStyle.display === 'flex') {
+          boxOverflow(state, page, column, 'rowGap');
+        }
+
+        if (state.currSlice === 0) {
+          state.leadPage = column.length;
+        }
 
         if (state.currPath.length === 2) {
           page.push({
@@ -344,8 +373,8 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
   );
 
   const calcPosition = React.useCallback(
-    function (schema: Schema, leadChanges?: Map<number, Path>) {
-      // For the useEffect
+    function (oldSchema: Schema, leadChanges?: Map<number, Path>) {
+      const schema = structuredClone(oldSchema);
       if (leadChanges == null) {
         leadChanges = new Map();
         structure.forEach((_, columnIndex) => {
@@ -354,79 +383,67 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
       }
 
       for (const [column, path] of leadChanges) {
-        schema[column] = allocateFromStructure(path, schema);
+        schema[column] = allocate(path, schema);
       }
+
+      return schema;
     },
-    [structure, allocateFromStructure],
+    [structure, allocate],
   );
 
-  const [schema, dispatch] = React.useReducer(reducer, [], (schema: Schema): Schema => {
-    schema = structure.map((column, columnIndex) => {
-      const page = column.map((_, fieldIndex) => {
-        return {
-          path: [columnIndex, fieldIndex],
-          current: 0,
-          leadPage: 0,
-          upperBound: 0,
-          lowerBound: 0,
-          addedHeight: 0,
-        };
-      });
-      return [page];
-    });
-
-    return schema;
-  });
+  const [schema, dispatch] = React.useReducer(reducer, [], init);
 
   const resizeHandler = React.useCallback((entries: ResizeObserverEntry[]) => {
     const leadChanges = entries.reduce((acc, { target: el }) => {
-      const potentialPath = (nodesMap.get(el) as Node).path;
-      const availablePath = acc.get(potentialPath[COLUMN]);
-
-      if (availablePath !== undefined) {
-        if (potentialPath[ROOT_NODE] < availablePath[ROOT_NODE]) {
-          acc.set(potentialPath[COLUMN], potentialPath.slice(0, 2));
-        }
-        return acc;
-      }
-
-      acc.set(potentialPath[COLUMN], potentialPath.slice(0, 2));
-
+      if (!nodesMap.sizeDiff(el)) return acc;
+      const path = (nodesMap.get(el) as Node).path;
+      acc.set(path[COLUMN], [path[COLUMN], 0]);
       return acc;
     }, new Map<number, Path>());
 
+    if (leadChanges.size === 0) return;
+
     setLoading(true);
-    dispatch({ type: 'resize', payload: { leadChanges } });
+    dispatch({ type: 'resize', payload: {} });
     setLoading(false);
   }, []);
 
-  const debouncedResizeHandler = React.useMemo(() => {
-    return debounce(resizeHandler, 50, true);
-  }, [resizeHandler]);
+  // const debouncedResizeHandler = React.useMemo(() => {
+  //   return debounce(resizeHandler, 50, true);
+  // }, [resizeHandler]);
 
   const observer = React.useMemo(() => {
-    const resize = new ResizeObserver(debouncedResizeHandler);
+    const resize = new ResizeObserver(resizeHandler);
 
     return {
       observe(node: Node) {
-        nodesMap.set(node);
-        if (node.path.length === 2) {
-          resize.observe(node.element, { box: 'border-box' });
-        }
+        resize.observe(node.element, { box: 'border-box' });
       },
       unobserve(node: Node) {
-        nodesMap.delete(node);
         resize.unobserve(node.element);
       },
+      disconnect() {
+        resize.disconnect();
+      },
     };
-  }, [debouncedResizeHandler]);
+  }, [resizeHandler]);
 
   const subNode = React.useCallback(
     (node: Node) => {
-      observer.observe(node);
-      return function unsubscribe() {
-        observer.unobserve(node);
-      };
+      nodesMap.set(node);
+      if (node.path.length === 2) {
+        observer.observe(node);
+      }
+
+      return function unsubscribe() {};
+    },
+    [observer],
+  );
+
+  const unsubNode = React.useCallback(
+    (node: Node) => {
+      nodesMap.delete(node);
+      return function unsubscribe() {};
     },
     [observer],
   );
@@ -435,23 +452,22 @@ export function PaginatorNested({ structure, pageWidth }: PaginatorNestedProps) 
     (ref: Element, path: Path) => {
       const [pageIdx, columnIdx] = path;
       if (pageIdx === 0) columnsMap.set(columnIdx, ref);
-      return function unsubscribe() {
-        if (pageIdx === 0) columnsMap.delete(columnIdx);
-      };
+      return function unsubscribe() {};
     },
     [columnsMap],
   );
 
   React.useEffect(() => {
-    console.log('useEffect Main');
-    dispatch({ type: 'resize', payload: {} });
-  }, [dispatch]);
+    dispatch({ type: 'reset', payload: {} });
+  }, [observer, structure]);
+
+  const zipped = React.useMemo(() => zip(schema), [schema]);
 
   return (
-    <SubscribersContext.Provider value={{ subNode, subColumn, subField: null }}>
+    <SubscribersContext.Provider value={{ subNode, subColumn, subField: null, unsubNode }}>
       <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
         <div className="rp-container">
-          {zip(schema).map((columns: Array<SchemaPage | null>, index) => {
+          {zipped.map((columns: Array<SchemaPage | null>, index) => {
             return (
               <PageNested
                 columns={columns}

@@ -16,12 +16,14 @@ import {
 import { type Node } from './PaginatorNested';
 export interface SubContextObject {
   subNode: Subscribe | null;
+  unsubNode: Subscribe | null;
   subField: Subscribe | null;
   subColumn: Subscribe | null;
 }
 
 export const SubscribersContext = React.createContext<SubContextObject>({
   subNode: null,
+  unsubNode: null,
   subField: null,
   subColumn: null,
 });
@@ -46,6 +48,7 @@ export interface State {
   freeHeight: number;
   field: StructureField | Node;
   style: Style<number>;
+  parentStyle: Style<number>;
   prevSibEl?: Element;
   nextSibEl?: Element;
 }
@@ -141,28 +144,30 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
 
   const boxOverflow = React.useCallback(
     (state: State, page: SchemaPage, column: SchemaColumn, box: keyof Style<number>) => {
-      let currentBox = state.style[box];
+      let currentBox = (box === 'rowGap' ? state.parentStyle[box] : state.style[box]) as number;
 
       // Logic to handle margin collapse between adjacent siblings.
       // Margin collapse between parent and descendants is handled
       // by .pb-page * { overflow: hidden; } css rule.
       // =================================================================
-      if (box === 'marginTop' && state.prevSibEl != null) {
-        currentBox = 0;
-      }
+      if (state.parentStyle.display !== 'flex') {
+        if (box === 'marginTop' && state.prevSibEl != null) {
+          currentBox = 0;
+        }
 
-      if (box === 'marginBottom' && state.nextSibEl != null) {
-        const { marginTop } = getStyle(state.nextSibEl);
-        currentBox = marginTop > currentBox ? marginTop : currentBox;
+        if (box === 'marginBottom' && state.nextSibEl != null) {
+          const { marginTop } = getStyle(state.nextSibEl);
+          currentBox = marginTop > currentBox ? marginTop : currentBox;
+        }
       }
       // =================================================================
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
         if (state.freeHeight >= currentBox) {
-          state.lowerBound = state.lowerBound + currentBox;
-          state.addedHeight = state.addedHeight + currentBox;
           state.freeHeight = state.freeHeight - currentBox;
+          state.addedHeight = state.addedHeight + currentBox;
+          if (box !== 'rowGap') state.lowerBound = state.lowerBound + currentBox;
           break;
         }
 
@@ -174,11 +179,7 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
           );
         }
 
-        if (
-          box === 'contentBox' &&
-          state.field.content === 'text' &&
-          state.freeHeight >= state.style.lineHeight
-        ) {
+        if (box === 'contentBox' && state.freeHeight >= state.style.lineHeight) {
           const cap = state.freeHeight - (state.freeHeight % state.style.lineHeight);
           state.lowerBound = state.lowerBound + cap;
           state.addedHeight = state.addedHeight + cap;
@@ -209,14 +210,14 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
     [columnsMap],
   );
 
-  const allocateFromStructure = React.useCallback(
+  const allocate = React.useCallback(
     (path: Path, schema: Schema) => {
       const [leadPage, sliceIdx] = findSlice(path, schema);
       const page: SchemaPage = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
       const column: SchemaColumn = schema[path[COLUMN]].slice(0, leadPage);
-      const { contentBox: columnHeight } = getStyle(columnsMap.get(path[COLUMN])!);
+      const parentStyle = getStyle(columnsMap.get(path[COLUMN])!);
       const addedHeight = page.at(-1)?.addedHeight ?? 0;
-      const freeHeight = columnHeight - addedHeight;
+      const freeHeight = parentStyle.contentBox - addedHeight;
 
       const state: State = {
         prevPath: [],
@@ -227,6 +228,7 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
         lowerBound: 0,
         addedHeight,
         freeHeight,
+        parentStyle,
         style: getStyle(fieldsMap.get(path) as Element),
         field: get(structure, path) as StructureField,
       };
@@ -238,49 +240,62 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
 
       while (pathStack.length > 0) {
         state.currPath = pathStack.pop()!;
-        const parent = state.currPath.slice(0, -1);
-        state.style = getStyle(fieldsMap.get(state.currPath) as Element);
-
+        const parentPath = state.currPath.slice(0, -1);
         state.field = get(structure, state.currPath) as StructureField;
-        state.prevSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! - 1]) as Element;
-        state.nextSibEl = fieldsMap.get([...parent, state.currPath.at(-1)! + 1]) as Element;
+        state.style = getStyle(fieldsMap.get(state.currPath) as Element);
+        // If currPath is a root node, then the parent is the column
+        if (parentPath.length === 1) state.parentStyle = parentStyle;
+        else state.parentStyle = getStyle(fieldsMap.get(parentPath) as Element);
+        state.prevSibEl = fieldsMap.get([...parentPath, state.currPath.at(-1)! - 1]) as Element;
+        state.nextSibEl = fieldsMap.get([...parentPath, state.currPath.at(-1)! + 1]) as Element;
 
-        if (
-          state.prevPath.length > 0 &&
-          state.prevPath[ROOT_FIELD] !== state.currPath[ROOT_FIELD]
-        ) {
+        const prevRoot = state.prevPath[ROOT_FIELD];
+        const currRoot = state.currPath[ROOT_FIELD];
+        const rootHasChanged = prevRoot != null && prevRoot !== currRoot;
+
+        if (rootHasChanged) {
           state.currSlice = 0;
-          state.upperBound = state.style.marginTop;
-          state.lowerBound = state.style.marginTop;
-        }
-
-        if (state.prevPath.length <= state.currPath.length) {
-          boxOverflow(state, page, column, 'marginTop');
-
-          if (state.field.content !== 'block') {
-            boxOverflow(state, page, column, 'borderTop');
-            boxOverflow(state, page, column, 'paddingTop');
-
-            if (state.field.children != null) {
-              pathStack.push([...state.currPath]);
-              for (let i = state.field.children.length - 1; i >= 0; i--) {
-                pathStack.push([...state.currPath, i]);
-              }
-              state.prevPath = [...state.currPath];
-              continue;
-            }
-
-            boxOverflow(state, page, column, 'contentBox');
+          if (state.parentStyle.display !== 'flex') {
+            state.upperBound = state.style.marginTop;
+            state.lowerBound = state.style.marginTop;
           } else {
-            boxOverflow(state, page, column, 'borderBox');
+            state.upperBound = 0;
+            state.lowerBound = 0;
           }
         }
 
-        if (state.field.content !== 'block') {
+        if (state.field.content === 'text' && state.prevPath.length <= state.currPath.length) {
+          boxOverflow(state, page, column, 'marginTop');
+          boxOverflow(state, page, column, 'borderTop');
+          boxOverflow(state, page, column, 'paddingTop');
+
+          if (state.field.children != null) {
+            pathStack.push([...state.currPath]);
+            for (let i = state.field.children.length - 1; i >= 0; i--) {
+              pathStack.push([...state.currPath, i]);
+            }
+            state.prevPath = [...state.currPath];
+            continue;
+          }
+
+          boxOverflow(state, page, column, 'contentBox');
+        }
+
+        if (state.field.content === 'text') {
           boxOverflow(state, page, column, 'paddingBottom');
           boxOverflow(state, page, column, 'borderBottom');
         }
+
+        if (state.field.content === 'block') {
+          boxOverflow(state, page, column, 'marginTop');
+          boxOverflow(state, page, column, 'borderBox');
+        }
+
         boxOverflow(state, page, column, 'marginBottom');
+
+        if (state.parentStyle.display === 'flex') {
+          boxOverflow(state, page, column, 'rowGap');
+        }
 
         if (state.currPath.length === 2) {
           page.push({
@@ -316,10 +331,10 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
       }
 
       for (const [column, path] of leadChanges) {
-        schema[column] = allocateFromStructure(path, schema);
+        schema[column] = allocate(path, schema);
       }
     },
-    [structure, allocateFromStructure],
+    [structure, allocate],
   );
 
   const [schema, dispatch] = React.useReducer(reducer, [], (schema: Schema): Schema => {
@@ -415,7 +430,7 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
   }, [dispatch]);
 
   return (
-    <SubscribersContext.Provider value={{ subField, subColumn, subNode: null }}>
+    <SubscribersContext.Provider value={{ subField, subColumn, subNode: null, unsubNode: null }}>
       <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
         <div className="rp-container">
           {zip(schema).map((columns: Array<SchemaPage | null>, index) => {

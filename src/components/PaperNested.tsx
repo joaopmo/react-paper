@@ -50,5 +50,7 @@ export function PaperNested({ children, pageWidth = 0.6 }: PaperNestedProps): JS
     return tempStructure;
   }, [children]);
 
+  // console.log(structure);
+
   return <PaginatorNested structure={structure} pageWidth={pageWidth} />;
 }

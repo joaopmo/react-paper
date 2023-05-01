@@ -29,6 +29,28 @@ const images = [
   'https://images.alphacoders.com/172/172203.jpg',
 ];
 
+// const style = {
+//   marginTop: `${getRandomInt(10)}px`,
+//   marginBottom: `${getRandomInt(10)}px`,
+//   paddingTop: `${getRandomInt(10)}px`,
+//   paddingBottom: `${getRandomInt(10)}px`,
+//   borderTop: '7px solid red',
+//   borderBottom: '7px solid green',
+// };
+
+const style = {
+  marginTop: `19px`,
+  marginBottom: `9px`,
+  paddingTop: `13px`,
+  paddingBottom: `5px`,
+  borderTop: '7px solid red',
+  borderBottom: '7px solid pink',
+  outline: 'blue solid',
+};
+
+const text1 = loremIpsum({ count: TEXT_COUNT, units: 'paragraphs' });
+const text2 = loremIpsum({ count: TEXT_COUNT, units: 'paragraphs' });
+
 export const StructPaper = () => {
   return (
     <Paper pageWidth={0.7}>
@@ -37,7 +59,17 @@ export const StructPaper = () => {
           element={
             <Wrapper>
               {(ref) => (
-                <div ref={ref}>
+                <img src={images[0]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
+              )}
+            </Wrapper>
+          }
+          content="block"
+        />
+        <Field
+          element={
+            <Wrapper>
+              {(ref) => (
+                <div ref={ref} style={{ ...style }}>
                   <Outlet />
                 </div>
               )}
@@ -48,15 +80,19 @@ export const StructPaper = () => {
             element={
               <Wrapper>
                 {(ref) => (
-                  <div ref={ref}>{loremIpsum({ count: TEXT_COUNT, units: 'paragraphs' })}</div>
+                  <img src={images[2]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
                 )}
               </Wrapper>
             }
+            content="block"
           />
+          <Field element={<Wrapper>{(ref) => <div ref={ref}>{text1}</div>}</Wrapper>} />
           <Field
             element={
               <Wrapper>
-                {(ref) => <img src={images[0]} alt="Image" ref={ref} style={{ width: '100%' }} />}
+                {(ref) => (
+                  <img src={images[0]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
+                )}
               </Wrapper>
             }
             content="block"
@@ -64,7 +100,9 @@ export const StructPaper = () => {
           <Field
             element={
               <Wrapper>
-                {(ref) => <img src={images[1]} alt="Image" ref={ref} style={{ width: '100%' }} />}
+                {(ref) => (
+                  <img src={images[1]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
+                )}
               </Wrapper>
             }
             content="block"
@@ -73,7 +111,9 @@ export const StructPaper = () => {
         <Field
           element={
             <Wrapper>
-              {(ref) => <img src={images[2]} alt="Image" ref={ref} style={{ width: '100%' }} />}
+              {(ref) => (
+                <img src={images[2]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
+              )}
             </Wrapper>
           }
           content="block"
@@ -91,19 +131,23 @@ export const StructPaper = () => {
             </Wrapper>
           }
         >
+          <Field element={<Wrapper>{(ref) => <div ref={ref}>{text2}</div>}</Wrapper>} />
           <Field
             element={
               <Wrapper>
                 {(ref) => (
-                  <div ref={ref}>{loremIpsum({ count: TEXT_COUNT, units: 'paragraphs' })}</div>
+                  <img src={images[3]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
                 )}
               </Wrapper>
             }
+            content="block"
           />
           <Field
             element={
               <Wrapper>
-                {(ref) => <img src={images[3]} alt="Image" ref={ref} style={{ width: '100%' }} />}
+                {(ref) => (
+                  <img src={images[4]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
+                )}
               </Wrapper>
             }
             content="block"
@@ -111,7 +155,9 @@ export const StructPaper = () => {
           <Field
             element={
               <Wrapper>
-                {(ref) => <img src={images[4]} alt="Image" ref={ref} style={{ width: '100%' }} />}
+                {(ref) => (
+                  <img src={images[0]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
+                )}
               </Wrapper>
             }
             content="block"
@@ -119,15 +165,9 @@ export const StructPaper = () => {
           <Field
             element={
               <Wrapper>
-                {(ref) => <img src={images[0]} alt="Image" ref={ref} style={{ width: '100%' }} />}
-              </Wrapper>
-            }
-            content="block"
-          />
-          <Field
-            element={
-              <Wrapper>
-                {(ref) => <img src={images[1]} alt="Image" ref={ref} style={{ width: '100%' }} />}
+                {(ref) => (
+                  <img src={images[1]} alt="Image" ref={ref} style={{ width: '100%', ...style }} />
+                )}
               </Wrapper>
             }
             content="block"
