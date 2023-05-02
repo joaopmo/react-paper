@@ -1,83 +1,113 @@
 /* eslint-disable  @typescript-eslint/no-non-null-assertion */
 import React from 'react';
 import { DimensionProvider } from './Dimension';
+import { assert, getStyle, zip } from '../utils';
 import { Page } from './Page';
-import { getStyle, get, zip, debounce, assert } from '../utils';
 import {
-  type Style,
-  type Subscribe,
+  type Path,
+  type Schema,
   type SchemaColumn,
   type SchemaPage,
-  type Schema,
   type Structure,
-  type StructureField,
-  type Path,
+  type Style,
+  type PartialStyle,
+  type Subscribe,
 } from '../types';
-import { type Node } from './PaginatorNested';
-export interface SubContextObject {
-  subNode: Subscribe | null;
-  unsubNode: Subscribe | null;
-  subField: Subscribe | null;
-  subColumn: Subscribe | null;
+
+const COLUMN = 0;
+const ROOT_NODE = 1;
+
+export interface Node {
+  path: Path;
+  children: number;
+  content: 'block' | 'text' | null;
+  element: Element;
+  prevSize: number;
 }
 
-export const SubscribersContext = React.createContext<SubContextObject>({
-  subNode: null,
-  unsubNode: null,
-  subField: null,
-  subColumn: null,
-});
+function useNodePathMap() {
+  const pathToNode = React.useRef<Map<string, Node>>(new Map());
+  const pathToChildren = React.useRef<Map<string, number>>(new Map());
 
-export function useSubscribers(): SubContextObject {
-  return React.useContext(SubscribersContext);
-}
-
-interface PaginatorProps {
-  structure: Structure;
-  pageWidth: number;
-}
-
-export interface State {
-  currPath: Path;
-  prevPath: Path;
-  leadPage: number;
-  currSlice: number;
-  upperBound: number;
-  lowerBound: number;
-  addedHeight: number;
-  freeHeight: number;
-  field: StructureField | Node;
-  style: Style<number>;
-  parentStyle: Style<number>;
-  prevSibEl?: Element;
-  nextSibEl?: Element;
-}
-
-function useElementPathMap() {
-  const elementToPath = React.useRef<Map<Element, Path>>(new Map());
-  const pathToElement = React.useRef<Map<string, Element>>(new Map());
-
-  return React.useMemo(() => {
+  return React.useMemo(function () {
     return {
-      set(keyOne: Element, keyTwo: Path) {
-        pathToElement.current.set(keyTwo.join('.'), keyOne);
-        elementToPath.current.set(keyOne, keyTwo);
+      set(node: Node) {
+        pathToNode.current.set(node.path.join('.'), node);
+
+        const childCount = pathToChildren.current.get(node.path.join('.'));
+        if (childCount == null) {
+          pathToChildren.current.set(node.path.join('.'), 0);
+        }
+
+        for (let i = node.path.length - 1; i > 0; i--) {
+          let parentChildCount = pathToChildren.current.get(node.path.slice(0, i).join('.'));
+
+          if (parentChildCount == null && childCount == null) {
+            pathToChildren.current.set(node.path.slice(0, i).join('.'), 1);
+            continue;
+          }
+
+          if (parentChildCount != null && childCount == null) {
+            pathToChildren.current.set(node.path.slice(0, i).join('.'), ++parentChildCount);
+          }
+          break;
+        }
+      },
+      sizeDiff(el: Element) {
+        const node = this.get(el);
+        if (node == null) return false;
+        const currSize = getStyle(el).borderBox;
+        this.set({ ...node, prevSize: currSize });
+        return node.prevSize !== currSize;
       },
       get(key: Element | Path) {
-        if (Array.isArray(key)) return pathToElement.current.get(key.join('.'));
-        if (key instanceof Element) return elementToPath.current.get(key);
+        if (Array.isArray(key)) {
+          const children = pathToChildren.current.get(key.join('.'));
+          const node = pathToNode.current.get(key.join('.'));
+          if (children != null && node != null) {
+            return {
+              ...node,
+              children,
+            };
+          }
+          return node;
+        }
+
+        if (key instanceof Element) {
+          for (const node of pathToNode.current.values()) {
+            if (
+              node.element.isEqualNode(key) ||
+              node.element === key ||
+              node.element.getAttribute('data-id') === key.getAttribute('data-id')
+            ) {
+              const children = pathToChildren.current.get(node.path.join('.'));
+              if (children != null) {
+                return {
+                  ...node,
+                  children,
+                };
+              }
+              return node;
+            }
+          }
+
+          return undefined;
+        }
       },
-      delete(keyOne: Element, keyTwo: Path) {
-        pathToElement.current.delete(keyTwo.join('.'));
-        elementToPath.current.delete(keyOne);
+      delete(node: Node) {
+        pathToNode.current.delete(node.path.join('.'));
+        const childDeleted = pathToChildren.current.delete(node.path.join('.'));
+        let parentChildCount = pathToChildren.current.get(node.path.slice(0, -1).join('.'));
+        if (parentChildCount != null && childDeleted) {
+          pathToChildren.current.set(node.path.slice(0, -1).join('.'), --parentChildCount);
+        }
       },
     };
   }, []);
 }
 
-export function useColumnsMap() {
+function useColumnsMap() {
   const columnsMap = React.useRef<Map<number, Element>>(new Map());
-
   return React.useMemo(() => {
     return {
       set(idx: number, ref: Element) {
@@ -93,23 +123,82 @@ export function useColumnsMap() {
   }, []);
 }
 
-export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element {
-  const COLUMN = 0;
-  const ROOT_FIELD = 1;
-  const [loading, setLoading] = React.useState(true);
-  const fieldsMap = useElementPathMap();
-  const columnsMap = useColumnsMap();
+interface PaginatorNestedProps {
+  structure: Structure;
+  pageWidth: number;
+}
 
-  function reducer(
-    state: Schema,
-    { type, payload }: { type: string; payload: { leadChanges?: Map<number, Path> } },
-  ) {
+export interface State {
+  currPath: Path;
+  prevPath: Path;
+  leadPage: number;
+  currSlice: number;
+  upperBound: number;
+  lowerBound: number;
+  addedHeight: number;
+  freeHeight: number;
+  field: Node;
+  style: Style<number>;
+  parentStyle: Style<number>;
+  prevSibEl?: Element;
+  nextSibEl?: Element;
+}
+
+export interface SubContextObject {
+  subNode: Subscribe | null;
+  unsubNode: Subscribe | null;
+  subField: Subscribe | null;
+  subColumn: Subscribe | null;
+}
+
+interface Action {
+  type: string;
+  payload: {
+    leadChanges?: Map<number, Path>;
+  };
+}
+
+export const SubscribersContext = React.createContext<SubContextObject>({
+  subNode: null,
+  unsubNode: null,
+  subField: null,
+  subColumn: null,
+});
+
+export function useSubscribers(): SubContextObject {
+  return React.useContext(SubscribersContext);
+}
+
+export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
+  const [loading, setLoading] = React.useState(true);
+  const columnsMap = useColumnsMap();
+  const nodesMap = useNodePathMap();
+
+  function init(schema: Schema): Schema {
+    schema = structure.map((column, columnIndex) => {
+      const page = column.map((_, fieldIndex) => {
+        return {
+          path: [columnIndex, fieldIndex],
+          current: 0,
+          leadPage: 0,
+          upperBound: 0,
+          lowerBound: 0,
+          addedHeight: 0,
+        };
+      });
+      return [page];
+    });
+
+    return schema;
+  }
+
+  function reducer(prevSchema: Schema, { type, payload }: Action) {
     const { leadChanges } = payload;
     switch (type) {
       case 'resize':
-        calcPosition(state, leadChanges);
-        return state;
-
+        return calcPosition(prevSchema, leadChanges);
+      case 'reset':
+        return init([]);
       default:
         throw new Error('Invalid case');
     }
@@ -124,16 +213,17 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
     let slice = 0;
 
     while (pageIt < column.length && sliceIt >= 0) {
-      if (column[pageIt][sliceIt].path[ROOT_FIELD] === fieldIndex) {
+      if (column[pageIt][sliceIt].path[ROOT_NODE] === fieldIndex) {
         page = column[pageIt][sliceIt].leadPage;
         slice = column[page].findIndex((value) => {
-          return value.path[ROOT_FIELD] === fieldIndex;
+          return value.path[ROOT_NODE] === fieldIndex;
         });
         return [page, slice];
       }
 
-      if (column[pageIt][sliceIt].path[1] < fieldIndex) {
+      if (column[pageIt][sliceIt].path[ROOT_NODE] < fieldIndex) {
         pageIt++;
+        sliceIt = column[pageIt].length - 1;
       } else {
         sliceIt--;
       }
@@ -143,8 +233,8 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
   }, []);
 
   const boxOverflow = React.useCallback(
-    (state: State, page: SchemaPage, column: SchemaColumn, box: keyof Style<number>) => {
-      let currentBox = (box === 'rowGap' ? state.parentStyle[box] : state.style[box]) as number;
+    (state: State, page: SchemaPage, column: SchemaColumn, box: keyof PartialStyle<number>) => {
+      let currentBox = box === 'rowGap' ? state.parentStyle[box] : state.style[box];
 
       // Logic to handle margin collapse between adjacent siblings.
       // Margin collapse between parent and descendants is handled
@@ -161,6 +251,8 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
         }
       }
       // =================================================================
+
+      if (currentBox === 0) return;
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -187,8 +279,8 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
           currentBox = currentBox - cap;
         }
 
-        if (box === 'marginTop' && state.currPath.length === 2) {
-          state.leadPage++;
+        if (state.currSlice === 0) {
+          state.leadPage = column.length;
         }
 
         page.push({
@@ -211,46 +303,46 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
   );
 
   const allocate = React.useCallback(
-    (path: Path, schema: Schema) => {
-      const [leadPage, sliceIdx] = findSlice(path, schema);
-      const page: SchemaPage = schema[path[COLUMN]][leadPage].slice(0, sliceIdx);
-      const column: SchemaColumn = schema[path[COLUMN]].slice(0, leadPage);
+    (path: Path) => {
+      const page: SchemaPage = [];
+      const column: SchemaColumn = [];
       const parentStyle = getStyle(columnsMap.get(path[COLUMN])!);
-      const addedHeight = page.at(-1)?.addedHeight ?? 0;
-      const freeHeight = parentStyle.contentBox - addedHeight;
+      const addedHeight = 0;
+      const freeHeight = parentStyle.contentBox;
 
       const state: State = {
         prevPath: [],
         currPath: path,
-        leadPage,
+        leadPage: 0,
         currSlice: 0,
         upperBound: 0,
         lowerBound: 0,
         addedHeight,
         freeHeight,
         parentStyle,
-        style: getStyle(fieldsMap.get(path) as Element),
-        field: get(structure, path) as StructureField,
+        style: getStyle((nodesMap.get(path) as Node).element),
+        field: nodesMap.get(path) as Node,
       };
 
       const pathStack: Path[] = [];
-      for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_FIELD]; i--) {
+      for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_NODE]; i--) {
         pathStack.push([path[COLUMN], i]);
       }
 
       while (pathStack.length > 0) {
         state.currPath = pathStack.pop()!;
         const parentPath = state.currPath.slice(0, -1);
-        state.field = get(structure, state.currPath) as StructureField;
-        state.style = getStyle(fieldsMap.get(state.currPath) as Element);
+        state.field = nodesMap.get(state.currPath) as Node;
+        state.style = getStyle((nodesMap.get(state.currPath) as Node).element);
+
         // If currPath is a root node, then the parent is the column
         if (parentPath.length === 1) state.parentStyle = parentStyle;
-        else state.parentStyle = getStyle(fieldsMap.get(parentPath) as Element);
-        state.prevSibEl = fieldsMap.get([...parentPath, state.currPath.at(-1)! - 1]) as Element;
-        state.nextSibEl = fieldsMap.get([...parentPath, state.currPath.at(-1)! + 1]) as Element;
+        else state.parentStyle = getStyle((nodesMap.get(parentPath) as Node).element);
+        state.prevSibEl = nodesMap.get([...parentPath, state.currPath.at(-1)! - 1])?.element;
+        state.nextSibEl = nodesMap.get([...parentPath, state.currPath.at(-1)! + 1])?.element;
 
-        const prevRoot = state.prevPath[ROOT_FIELD];
-        const currRoot = state.currPath[ROOT_FIELD];
+        const prevRoot = state.prevPath[ROOT_NODE];
+        const currRoot = state.currPath[ROOT_NODE];
         const rootHasChanged = prevRoot != null && prevRoot !== currRoot;
 
         if (rootHasChanged) {
@@ -269,9 +361,9 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
           boxOverflow(state, page, column, 'borderTop');
           boxOverflow(state, page, column, 'paddingTop');
 
-          if (state.field.children != null) {
+          if (state.field.children !== 0) {
             pathStack.push([...state.currPath]);
-            for (let i = state.field.children.length - 1; i >= 0; i--) {
+            for (let i = state.field.children - 1; i >= 0; i--) {
               pathStack.push([...state.currPath, i]);
             }
             state.prevPath = [...state.currPath];
@@ -297,6 +389,10 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
           boxOverflow(state, page, column, 'rowGap');
         }
 
+        if (state.currSlice === 0) {
+          state.leadPage = column.length;
+        }
+
         if (state.currPath.length === 2) {
           page.push({
             path: state.currPath.slice(0, 2),
@@ -317,12 +413,12 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
 
       return column;
     },
-    [findSlice, columnsMap, fieldsMap, structure, boxOverflow],
+    [columnsMap, structure, boxOverflow],
   );
 
   const calcPosition = React.useCallback(
-    function (schema: Schema, leadChanges?: Map<number, Path>) {
-      // For the useEffect
+    function (oldSchema: Schema, leadChanges?: Map<number, Path>) {
+      const schema = structuredClone(oldSchema);
       if (leadChanges == null) {
         leadChanges = new Map();
         structure.forEach((_, columnIndex) => {
@@ -331,85 +427,62 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
       }
 
       for (const [column, path] of leadChanges) {
-        schema[column] = allocate(path, schema);
+        schema[column] = allocate(path);
       }
+
+      return schema;
     },
     [structure, allocate],
   );
 
-  const [schema, dispatch] = React.useReducer(reducer, [], (schema: Schema): Schema => {
-    schema = structure.map((column, columnIndex) => {
-      const page = column.map((_, fieldIndex) => {
-        return {
-          path: [columnIndex, fieldIndex],
-          current: 0,
-          leadPage: 0,
-          upperBound: 0,
-          lowerBound: 0,
-          addedHeight: 0,
-        };
-      });
-      return [page];
-    });
+  const [schema, dispatch] = React.useReducer(reducer, [], init);
 
-    return schema;
-  });
+  const resizeHandler = React.useCallback((entries: ResizeObserverEntry[]) => {
+    const leadChanges = entries.reduce((acc, { target: el }) => {
+      if (!nodesMap.sizeDiff(el)) return acc;
+      const path = (nodesMap.get(el) as Node).path;
+      acc.set(path[COLUMN], [path[COLUMN], 0]);
+      return acc;
+    }, new Map<number, Path>());
 
-  const resizeHandler = React.useCallback(
-    (entries: ResizeObserverEntry[]) => {
-      // Column to the path of its first resized field
-      const leadChanges = entries.reduce((acc, { target: el }) => {
-        const potentialPath = fieldsMap.get(el) as Path;
-        const availablePath = acc.get(potentialPath[COLUMN]);
+    if (leadChanges.size === 0) return;
 
-        if (availablePath !== undefined) {
-          if (potentialPath[ROOT_FIELD] < availablePath[ROOT_FIELD]) {
-            acc.set(potentialPath[COLUMN], potentialPath.slice(0, 2));
-          }
-          return acc;
-        }
-
-        acc.set(potentialPath[COLUMN], potentialPath.slice(0, 2));
-
-        return acc;
-      }, new Map<number, Path>());
-
-      setLoading(true);
-      dispatch({ type: 'resize', payload: { leadChanges } });
-      setLoading(false);
-    },
-    [fieldsMap],
-  );
-
-  const debouncedResizeHandler = React.useMemo(() => {
-    return debounce(resizeHandler, 50, true);
-  }, [resizeHandler]);
+    setLoading(true);
+    dispatch({ type: 'resize', payload: {} });
+    setLoading(false);
+  }, []);
 
   const observer = React.useMemo(() => {
-    const resize = new ResizeObserver(debouncedResizeHandler);
-
+    const resize = new ResizeObserver(resizeHandler);
     return {
-      observe(el: Element, path: Path) {
-        fieldsMap.set(el, path);
-        if (path.length === 2) {
-          resize.observe(el, { box: 'border-box' });
-        }
+      observe(node: Node) {
+        resize.observe(node.element, { box: 'border-box' });
       },
-      unobserve(el: Element, path: Path) {
-        fieldsMap.delete(el, path);
-        if (path.length === 2) {
-          resize.unobserve(el);
-        }
+      unobserve(node: Node) {
+        resize.unobserve(node.element);
+      },
+      disconnect() {
+        resize.disconnect();
       },
     };
-  }, [debouncedResizeHandler, fieldsMap]);
+  }, [resizeHandler]);
 
-  const subField = React.useCallback(
-    (ref: Element, path: Path) => {
-      observer.observe(ref, path);
-      return function unsubscribe() {
-        observer.unobserve(ref, path);
-      };
+  const subNode = React.useCallback(
+    (node: Node) => {
+      nodesMap.set(node);
+      if (node.path.length === 2) {
+        observer.observe(node);
+      }
+
+      return function unsubscribe() {};
+    },
+    [observer],
+  );
+
+  const unsubNode = React.useCallback(
+    (node: Node) => {
+      nodesMap.delete(node);
+      return function unsubscribe() {};
     },
     [observer],
   );
@@ -418,22 +491,31 @@ export function Paginator({ structure, pageWidth }: PaginatorProps): JSX.Element
     (ref: Element, path: Path) => {
       const [pageIdx, columnIdx] = path;
       if (pageIdx === 0) columnsMap.set(columnIdx, ref);
-      return function unsubscribe() {
-        if (pageIdx === 0) columnsMap.delete(columnIdx);
-      };
+      return function unsubscribe() {};
     },
     [columnsMap],
   );
 
   React.useEffect(() => {
-    dispatch({ type: 'resize', payload: {} });
-  }, [dispatch]);
+    dispatch({ type: 'reset', payload: {} });
+  }, [structure]);
+
+  React.useEffect(() => {
+    return () => {
+      observer.disconnect();
+    };
+  }, [observer]);
+
+  const zipped = React.useMemo(() => zip(schema), [schema]);
+
+  const count = React.useRef(0);
+  console.log(count.current++);
 
   return (
-    <SubscribersContext.Provider value={{ subField, subColumn, subNode: null, unsubNode: null }}>
+    <SubscribersContext.Provider value={{ subNode, subColumn, subField: null, unsubNode }}>
       <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
         <div className="rp-container">
-          {zip(schema).map((columns: Array<SchemaPage | null>, index) => {
+          {zipped.map((columns: Array<SchemaPage | null>, index) => {
             return (
               <Page
                 columns={columns}

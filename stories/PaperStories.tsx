@@ -1,7 +1,7 @@
 import React from 'react';
 import { loremIpsum } from 'lorem-ipsum';
 import { Level, useRegister } from '../src/components/Level';
-import { PaperNested } from '../src/components/PaperNested';
+import { Paper } from '../src/components/Paper';
 import { Column } from '../src';
 import { Node } from '../src/components/Node';
 import '../src/styles/base.css';
@@ -70,17 +70,17 @@ function Image() {
   );
 }
 
-export const NestedPaper = () => {
+export const PaperStories = () => {
   const [firstText, setFirstText] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     setTimeout(() => {
       setFirstText(true);
-    }, 3000);
+    }, 10000);
   }, []);
 
   return (
-    <PaperNested pageWidth={0.7}>
+    <Paper pageWidth={0.7}>
       <Column>
         <Level>
           {/* 0.0 */}
@@ -129,6 +129,6 @@ export const NestedPaper = () => {
           <Node element={<Text />} />
         </Level>
       </Column>
-    </PaperNested>
+    </Paper>
   );
 };

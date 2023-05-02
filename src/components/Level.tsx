@@ -1,8 +1,8 @@
 import React from 'react';
 import { assert, getStyle } from '../utils';
 import { Node } from './Node';
-import { useSubscribers } from './Paginator';
 import { type Path } from '../types';
+import { useSubscribers } from './Paginator';
 
 export interface Register {
   ref: ((arg: Element | null) => void) | null | React.MutableRefObject<null>;

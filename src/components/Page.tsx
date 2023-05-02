@@ -1,13 +1,12 @@
 import React from 'react';
 import { useDimension } from './Dimension';
-import { useSubscribers } from './Paginator';
-import { renderWithOutlet } from './Outlet';
-import { get } from '../utils';
+import { LevelProvider } from './Level';
 import { Backdrop } from './Backdrop';
 import { Spinner } from './Spinner';
-import { type SchemaPage, type Structure, type StructureField } from '../types';
+import { type SchemaPage, type Structure } from '../types';
+import { useSubscribers } from './Paginator';
 
-interface PageProps {
+interface PageNestedProps {
   structure: Structure;
   columns: Array<SchemaPage | null>;
   index: number;
@@ -22,42 +21,35 @@ interface ColumnProps {
 }
 
 function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX.Element {
-  const [ref, setRef] = React.useState<Element | null>(null);
   const { subColumn } = useSubscribers();
-
-  React.useLayoutEffect(() => {
-    if (ref != null && subColumn != null) return subColumn(ref, [pageIndex, columnIndex]);
-  }, [columnIndex, pageIndex, ref, subColumn]);
 
   const reference = React.useCallback(
     (el: Element | null) => {
-      if (el != null && el !== ref && pageIndex === 0) {
-        setRef(el);
+      if (el != null && pageIndex === 0 && subColumn != null) {
+        // setRef(el);
+        subColumn(el, [pageIndex, columnIndex]);
       }
     },
-    [pageIndex, ref],
+    [pageIndex],
   );
 
   return (
     <div className={`rp-column rp-column-${columnIndex}`} ref={reference}>
       {column?.map((slice) => {
-        const calcHeight = slice.lowerBound - slice.upperBound;
-        const height = calcHeight !== 0 ? calcHeight : 'none';
-        const minHeight = height;
-        const maxHeight = height;
+        const height = slice.lowerBound - slice.upperBound;
+        const maxHeight = slice.lowerBound === 0 && slice.upperBound === 0 ? 'none' : height;
         const top = -slice.upperBound;
 
         return (
-          <div
-            key={`${slice.current}.${slice.path.join('.')}`}
-            style={{ overflow: 'hidden', maxHeight, minHeight }}
-          >
+          <div style={{ overflow: 'hidden', maxHeight }} key={`${slice.path.join('.')}`}>
             <div style={{ position: 'relative', top }}>
-              {renderWithOutlet(
-                get(structure, slice.path) as StructureField,
-                slice.path,
-                slice.current === 0,
-              )}
+              <LevelProvider
+                path={slice.path}
+                content={structure[slice.path[0]][slice.path[1]].content ?? 'text'}
+                subscribe={slice.current === 0}
+              >
+                {structure[slice.path[0]][slice.path[1]].element}
+              </LevelProvider>
             </div>
           </div>
         );
@@ -66,7 +58,12 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
   );
 }
 
-export function Page({ columns, structure, index, loading }: PageProps): JSX.Element {
+export const Page = React.memo(function PageNested({
+  columns,
+  structure,
+  index,
+  loading,
+}: PageNestedProps): JSX.Element {
   const { scale, ...dimension } = useDimension();
 
   return (
@@ -93,4 +90,4 @@ export function Page({ columns, structure, index, loading }: PageProps): JSX.Ele
       })}
     </div>
   );
-}
+});

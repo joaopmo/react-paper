@@ -1,9 +1,8 @@
 import React from 'react';
-import { NestedPaper } from '../stories/NestedPaper';
-import { StructPaper } from '../stories/StructPaper';
+import { PaperStories } from '../stories/PaperStories';
 
 const App = () => {
-  return <NestedPaper />;
+  return <PaperStories />;
 };
 
 export default App;

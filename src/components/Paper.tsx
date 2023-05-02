@@ -1,54 +1,55 @@
 import React from 'react';
-import { assert, structureFromChildren, xor } from '../utils';
-import { Paginator } from './Paginator';
+import { assert } from '../utils';
 import { Column } from './Column';
+import { Level } from './Level';
+import { Node } from './Node';
 import { type Structure } from '../types';
-
-interface BaseProps {
-  pageWidth?: number;
-}
-interface PaperChildrenProps extends BaseProps {
-  children: React.ReactNode | null;
-  structure?: Structure | null;
+import { Paginator } from './Paginator';
+interface PaperNestedProps {
+  children: React.ReactNode;
+  pageWidth: number;
 }
 
-interface PaperStructureProps extends BaseProps {
-  children?: React.ReactNode | null;
-  structure: Structure | null;
-}
+export function Paper({ children, pageWidth = 0.6 }: PaperNestedProps): JSX.Element {
+  const iterate = React.useCallback(
+    (children: React.ReactNode, structure: Structure, index: number = 0) => {
+      React.Children.forEach(children, (child, childIndex) => {
+        assert(React.isValidElement(child), `Column ${childIndex} is an invalid React Element`);
 
-type PaperProps = PaperChildrenProps | PaperStructureProps;
+        switch (child.type) {
+          case Column:
+            iterate(child.props.children, structure, childIndex);
+            return;
+          case Level:
+            iterate(child.props.children, structure, index);
+            return;
+          case Node:
+            return structure[index].push({
+              element: child.props.element ?? null,
+              content: child.props.content ?? 'text',
+              children: null,
+            });
+          default:
+            assert(
+              false,
+              `Invalid component [${
+                typeof child.type === 'string' ? child.type : child.type.name
+              }].`,
+            );
+        }
+      });
+    },
+    [],
+  );
 
-export function Paper({ children, structure, pageWidth = 0.6 }: PaperProps): JSX.Element {
-  assert(xor(children, structure), `<Paper> should have either children or structure props`);
-
-  const structFromChildren = React.useMemo(() => {
-    if (children === undefined || children === null) return;
+  const structure = React.useMemo(() => {
     const columnCount = React.Children.toArray(children).length;
     const tempStructure: Structure = Array.from({ length: columnCount }, () => []);
-
-    React.Children.forEach(children, (column, columnIndex) => {
-      if (!React.isValidElement(column)) return;
-
-      assert(
-        column.type === Column,
-        `[${
-          typeof column.type === 'string' ? column.type : column.type.name
-        }] is not a <Column> component. All component children of <Paper> must be a <Column>`,
-      );
-
-      if (column.props.children === undefined || column.props.children === null) return;
-
-      React.Children.forEach(column.props.children, (field) => {
-        if (!React.isValidElement(field)) return;
-        tempStructure[columnIndex].push(...structureFromChildren(field));
-      });
-    });
-
+    iterate(children, tempStructure);
     return tempStructure;
   }, [children]);
 
-  return (
-    <Paginator structure={structure ?? (structFromChildren as Structure)} pageWidth={pageWidth} />
-  );
+  // console.log(structure);
+
+  return <Paginator structure={structure} pageWidth={pageWidth} />;
 }
