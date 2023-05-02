@@ -11,7 +11,6 @@ import {
   type Structure,
   type Style,
   type PartialStyle,
-  type Subscribe,
 } from '../types';
 
 const COLUMN = 0;
@@ -78,7 +77,7 @@ function useNodePathMap() {
             if (
               node.element.isEqualNode(key) ||
               node.element === key ||
-              node.element.getAttribute('data-id') === key.getAttribute('data-id')
+              node.element.getAttribute('data-rp') === key.getAttribute('data-rp')
             ) {
               const children = pathToChildren.current.get(node.path.join('.'));
               if (children != null) {
@@ -145,23 +144,19 @@ export interface State {
 }
 
 export interface SubContextObject {
-  subNode: Subscribe | null;
-  unsubNode: Subscribe | null;
-  subField: Subscribe | null;
-  subColumn: Subscribe | null;
+  subNode: ((node: Node) => () => void) | null;
+  subColumn: ((el: Element, columnIndex: number) => void) | null;
 }
 
 interface Action {
   type: string;
   payload: {
-    leadChanges?: Map<number, Path>;
+    changes?: Map<number, Path>;
   };
 }
 
 export const SubscribersContext = React.createContext<SubContextObject>({
   subNode: null,
-  unsubNode: null,
-  subField: null,
   subColumn: null,
 });
 
@@ -193,10 +188,10 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
   }
 
   function reducer(prevSchema: Schema, { type, payload }: Action) {
-    const { leadChanges } = payload;
+    const { changes } = payload;
     switch (type) {
       case 'resize':
-        return calcPosition(prevSchema, leadChanges);
+        return calcPosition(prevSchema, changes);
       case 'reset':
         return init([]);
       default:
@@ -417,16 +412,16 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
   );
 
   const calcPosition = React.useCallback(
-    function (oldSchema: Schema, leadChanges?: Map<number, Path>) {
+    function (oldSchema: Schema, changes?: Map<number, Path>) {
       const schema = structuredClone(oldSchema);
-      if (leadChanges == null) {
-        leadChanges = new Map();
+      if (changes == null) {
+        changes = new Map();
         structure.forEach((_, columnIndex) => {
-          leadChanges?.set(columnIndex, [columnIndex, 0]);
+          changes?.set(columnIndex, [columnIndex, 0]);
         });
       }
 
-      for (const [column, path] of leadChanges) {
+      for (const [column, path] of changes) {
         schema[column] = allocate(path);
       }
 
@@ -438,14 +433,14 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
   const [schema, dispatch] = React.useReducer(reducer, [], init);
 
   const resizeHandler = React.useCallback((entries: ResizeObserverEntry[]) => {
-    const leadChanges = entries.reduce((acc, { target: el }) => {
+    const changes = entries.reduce((acc, { target: el }) => {
       if (!nodesMap.sizeDiff(el)) return acc;
       const path = (nodesMap.get(el) as Node).path;
       acc.set(path[COLUMN], [path[COLUMN], 0]);
       return acc;
     }, new Map<number, Path>());
 
-    if (leadChanges.size === 0) return;
+    if (changes.size === 0) return;
 
     setLoading(true);
     dispatch({ type: 'resize', payload: {} });
@@ -474,24 +469,16 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
         observer.observe(node);
       }
 
-      return function unsubscribe() {};
-    },
-    [observer],
-  );
-
-  const unsubNode = React.useCallback(
-    (node: Node) => {
-      nodesMap.delete(node);
-      return function unsubscribe() {};
+      return function unsubscribe() {
+        nodesMap.delete(node);
+      };
     },
     [observer],
   );
 
   const subColumn = React.useCallback(
-    (ref: Element, path: Path) => {
-      const [pageIdx, columnIdx] = path;
-      if (pageIdx === 0) columnsMap.set(columnIdx, ref);
-      return function unsubscribe() {};
+    (ref: Element, columnIndex: number) => {
+      columnsMap.set(columnIndex, ref);
     },
     [columnsMap],
   );
@@ -512,7 +499,7 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
   console.log(count.current++);
 
   return (
-    <SubscribersContext.Provider value={{ subNode, subColumn, subField: null, unsubNode }}>
+    <SubscribersContext.Provider value={{ subNode, subColumn }}>
       <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
         <div className="rp-container">
           {zipped.map((columns: Array<SchemaPage | null>, index) => {

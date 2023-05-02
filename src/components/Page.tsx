@@ -26,8 +26,7 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
   const reference = React.useCallback(
     (el: Element | null) => {
       if (el != null && pageIndex === 0 && subColumn != null) {
-        // setRef(el);
-        subColumn(el, [pageIndex, columnIndex]);
+        subColumn(el, columnIndex);
       }
     },
     [pageIndex],

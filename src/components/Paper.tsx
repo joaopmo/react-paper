@@ -49,7 +49,5 @@ export function Paper({ children, pageWidth = 0.6 }: PaperNestedProps): JSX.Elem
     return tempStructure;
   }, [children]);
 
-  // console.log(structure);
-
   return <Paginator structure={structure} pageWidth={pageWidth} />;
 }

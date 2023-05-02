@@ -6,7 +6,7 @@ import { useSubscribers } from './Paginator';
 
 export interface Register {
   ref: ((arg: Element | null) => void) | null | React.MutableRefObject<null>;
-  'data-id': string;
+  'data-rp': string;
 }
 interface LevelContextObject {
   register: () => Register;
@@ -15,7 +15,7 @@ interface LevelContextObject {
 }
 
 const LevelContext = React.createContext<LevelContextObject>({
-  register: () => ({ ref: null, 'data-id': '' }),
+  register: () => ({ ref: null, 'data-rp': '' }),
   path: [],
   subscribe: false,
 });
@@ -41,60 +41,12 @@ export const LevelProvider = React.memo(function LevelProvider({
   content,
   subscribe,
 }: LevelProviderProps) {
-  // const [ref, setRef] = React.useState<Element | null>(null);
-
-  // console.log('LevelProvider', path);
-
-  const { subNode, unsubNode } = useSubscribers();
-
-  // React.useLayoutEffect(() => {
-  //   if (ref != null && subNode != null) {
-  //     return subNode({
-  //       path,
-  //       children: 0,
-  //       content: content ?? 'text',
-  //       element: ref,
-  //       prevSize: 0,
-  //     });
-  //   }
-  // }, [path, ref, subNode]);
-
-  // const reference = React.useCallback(
-  //   (el: Element | null) => {
-  //     // if (el != null && !el.isEqualNode(ref) && subscribe) {
-  //     //   setRef(el);
-  //     // }
-
-  //     // console.log(path, el);
-
-  //     if (el != null && subNode != null && subscribe) {
-  //       subNode({
-  //         path,
-  //         children: 0,
-  //         content: content ?? 'text',
-  //         element: el,
-  //         prevSize: 0,
-  //       });
-  //     }
-
-  //     if (el == null && unsubNode != null && subscribe) {
-  //       unsubNode({
-  //         path,
-  //         children: 0,
-  //         content: content ?? 'text',
-  //         element: el,
-  //         prevSize: 0,
-  //       });
-  //     }
-  //   },
-  //   [subNode, unsubNode],
-  // );
-
+  const { subNode } = useSubscribers();
   const ref = React.useRef(null);
 
   React.useEffect(() => {
     if (ref.current != null && subNode != null && subscribe) {
-      subNode({
+      return subNode({
         path,
         children: 0,
         content: content ?? 'text',
@@ -102,26 +54,11 @@ export const LevelProvider = React.memo(function LevelProvider({
         prevSize: getStyle(ref.current).borderBox, // TODO: check
       });
     }
-
-    if (unsubNode != null && subscribe) {
-      return () => {
-        unsubNode({
-          path,
-          children: 0,
-          content: content ?? 'text',
-          element: null,
-          prevSize: 0,
-        });
-      };
-    }
-  }, [subNode, unsubNode, path, subscribe]);
+  }, [subNode, path, subscribe]);
 
   const register = React.useCallback((): Register => {
-    return {
-      ref,
-      'data-id': path.join('.'),
-    };
-  }, []);
+    return { ref, 'data-rp': path.join('.') };
+  }, [path]);
 
   return (
     <LevelContext.Provider value={{ register, path, subscribe }}>{children}</LevelContext.Provider>
@@ -133,7 +70,6 @@ interface LevelProps {
 }
 
 export function Level({ children }: LevelProps) {
-  // const parentPath = usePath();
   const { path: parentPath, subscribe } = useLevelContext();
 
   let index = 0;
