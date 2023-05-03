@@ -380,7 +380,7 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
 
       return column;
     },
-    [columnsMap, structure, boxOverflow],
+    [columnsMap, nodesMap, structure, boxOverflow],
   );
 
   const calcPosition = React.useCallback(
@@ -404,20 +404,23 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
 
   const [schema, dispatch] = React.useReducer(reducer, [], init);
 
-  const resizeHandler = React.useCallback((entries: ResizeObserverEntry[]) => {
-    const changes = entries.reduce((acc, { target: el }) => {
-      if (!nodesMap.sizeDiff(el)) return acc;
-      const path = (nodesMap.get(el) as Node).path;
-      acc.set(path[COLUMN], [path[COLUMN], 0]);
-      return acc;
-    }, new Map<number, Path>());
+  const resizeHandler = React.useCallback(
+    (entries: ResizeObserverEntry[]) => {
+      const changes = entries.reduce((acc, { target: el }) => {
+        if (!nodesMap.sizeDiff(el)) return acc;
+        const path = (nodesMap.get(el) as Node).path;
+        acc.set(path[COLUMN], [path[COLUMN], 0]);
+        return acc;
+      }, new Map<number, Path>());
 
-    if (changes.size === 0) return;
+      if (changes.size === 0) return;
 
-    setLoading(true);
-    dispatch({ type: 'resize', payload: {} });
-    setLoading(false);
-  }, []);
+      setLoading(true);
+      dispatch({ type: 'resize', payload: {} });
+      setLoading(false);
+    },
+    [nodesMap],
+  );
 
   const observer = React.useMemo(() => {
     const resize = new ResizeObserver(resizeHandler);
@@ -445,7 +448,7 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
         nodesMap.delete(node);
       };
     },
-    [observer],
+    [nodesMap, observer],
   );
 
   const subColumn = React.useCallback(
@@ -466,9 +469,6 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
   }, [observer]);
 
   const zipped = React.useMemo(() => zip(schema), [schema]);
-
-  const count = React.useRef(0);
-  console.log(count.current++);
 
   return (
     <SubscribersContext.Provider value={{ subNode, subColumn }}>

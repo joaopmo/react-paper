@@ -1,5 +1,5 @@
 import React from 'react';
-import { assert, getStyle } from '../utils';
+import { assert } from '../utils';
 import { Node } from './Node';
 import { type Path } from '../types';
 import { useSubscribers } from './Paginator';
@@ -52,10 +52,10 @@ export const LevelProvider = React.memo(function LevelProvider({
         children: 0,
         content: content ?? 'text',
         element: ref.current,
-        prevSize: getStyle(ref.current, 'borderBox'),
+        prevSize: -1,
       });
     }
-  }, [subNode, path, subscribe]);
+  }, [subNode, path, subscribe, content]);
 
   const register = React.useCallback((): Register => {
     return { ref, 'data-rp': path.join('.') };
