@@ -1,8 +1,8 @@
 import React from 'react';
 import { loremIpsum } from 'lorem-ipsum';
-import { Level, useRegister, Paper, Column, Node } from '../src';
-import '../src/styles/base.css';
-import '../src/styles/print.css';
+import { Level, useRegister, Paper, Column, Node } from '../dist/src';
+import '../dist/styles/base.css';
+import '../dist/styles/print.css';
 
 function getRandomInt(max: number) {
   return Math.floor(Math.random() * max);
