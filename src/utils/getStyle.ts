@@ -1,11 +1,9 @@
-import { type Style, type PartialStyle } from '../types';
+import { type AtLeastOne, type PartialStyle, type Style } from '../types';
 
-const properties: PartialStyle<string> = {
+const baseProperties: PartialStyle<string> = {
   borderBox: 'height',
   contentBox: 'height',
-  marginBox: 'height',
   rowGap: 'row-gap',
-  fontSize: 'font-size',
   lineHeight: 'line-height',
   marginTop: 'margin-top',
   marginBottom: 'margin-bottom',
@@ -14,34 +12,111 @@ const properties: PartialStyle<string> = {
   borderTop: 'border-top-width',
   borderBottom: 'border-bottom-width',
 };
-export const getStyle = (el: Element): Style<number> => {
+
+interface BoxSizing {
+  boxSizing: string;
+}
+
+interface Display {
+  display: string;
+}
+
+type FilledStyle<T> = AtLeastOne<Partial<PartialStyle<T>>>;
+type StringOrFilledStyle = BoxSizing | Display | FilledStyle<string>;
+
+function isBoxSizing(props: object): props is BoxSizing {
+  return Object.hasOwn(props, 'boxSizing');
+}
+
+function isDisplay(props: object): props is Display {
+  return Object.hasOwn(props, 'display');
+}
+
+function unwrapBorders({
+  paddingTop,
+  paddingBottom,
+  borderTop,
+  borderBottom,
+}: FilledStyle<string>) {
+  return {
+    paddingTop,
+    paddingBottom,
+    borderTop,
+    borderBottom,
+  };
+}
+
+function getPartialStyle(el: Element, props: BoxSizing): BoxSizing;
+
+function getPartialStyle(el: Element, props: Display): Display;
+
+function getPartialStyle(
+  el: Element,
+  props: FilledStyle<string>,
+): Record<keyof typeof props, number>;
+function getPartialStyle(el: Element, props: StringOrFilledStyle): unknown {
   const style = window.getComputedStyle(el);
 
-  const partialSizes = Object.entries(properties).reduce<PartialStyle<number>>(
+  if (isBoxSizing(props)) {
+    return {
+      boxSizing: style.getPropertyValue(props.boxSizing),
+    };
+  }
+
+  if (isDisplay(props)) {
+    return {
+      display: style.getPropertyValue(props.display),
+    };
+  }
+
+  return Object.entries(props).reduce<FilledStyle<number>>(
     (acc, [key, val]) => {
-      const valIsNan = Number.isNaN(parseFloat(style.getPropertyValue(val)));
-      acc[key as keyof PartialStyle<number>] = valIsNan
-        ? 0
-        : parseFloat(style.getPropertyValue(val));
+      const value = parseFloat(style.getPropertyValue(val));
+      acc[key as keyof FilledStyle<number>] = Number.isNaN(value) ? 0 : value;
       return acc;
     },
     // eslint-disable-next-line
-    {} as PartialStyle<number>,
+    {} as FilledStyle<number>,
   );
+}
 
-  const sizes: Style<number> = { ...partialSizes, display: style.getPropertyValue('display') };
+export function getStyle(el: Element, property: keyof PartialStyle<string>): number;
 
-  if (style.getPropertyValue('box-sizing') === 'border-box') {
+export function getStyle(el: Element): Style<number>;
+export function getStyle(el: Element, prop?: keyof PartialStyle<string>): number | Style<number> {
+  if (prop != null) {
+    let { [prop]: value } = getPartialStyle(el, { [prop]: baseProperties[prop] });
+    const boxSizing: BoxSizing = { boxSizing: 'box-sizing' };
+
+    if (prop === 'contentBox' && getPartialStyle(el, boxSizing).boxSizing === 'border-box') {
+      const borders = getPartialStyle(el, unwrapBorders(baseProperties));
+      Object.values(borders).forEach((border: number) => {
+        value -= border;
+      });
+    }
+
+    if (prop === 'borderBox' && getPartialStyle(el, boxSizing).boxSizing !== 'border-box') {
+      const borders = getPartialStyle(el, unwrapBorders(baseProperties));
+      Object.values(borders).forEach((border: number) => {
+        value += border;
+      });
+    }
+
+    return value;
+  }
+
+  const partialSizes = getPartialStyle(el, baseProperties);
+
+  const { display } = getPartialStyle(el, { display: 'display' });
+  const sizes: Style<number> = { ...partialSizes, display };
+
+  if (getPartialStyle(el, { boxSizing: 'box-sizing' }).boxSizing === 'border-box') {
     sizes.contentBox -= sizes.paddingTop + sizes.paddingBottom;
     sizes.contentBox -= sizes.borderTop + sizes.borderBottom;
-    sizes.marginBox += sizes.marginTop + sizes.marginBottom;
   } else {
     sizes.borderBox += sizes.paddingTop + sizes.paddingBottom;
     sizes.borderBox += sizes.borderTop + sizes.borderBottom;
-    sizes.marginBox += sizes.paddingTop + sizes.paddingBottom;
-    sizes.marginBox += sizes.borderTop + sizes.borderBottom;
-    sizes.marginBox += sizes.marginTop + sizes.marginBottom;
   }
 
   return sizes;
-};
+}

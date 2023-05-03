@@ -24,7 +24,7 @@ export interface Node {
   prevSize: number;
 }
 
-function useNodePathMap() {
+function useNodesMap() {
   const pathToNode = React.useRef<Map<string, Node>>(new Map());
   const pathToChildren = React.useRef<Map<string, number>>(new Map());
 
@@ -55,7 +55,7 @@ function useNodePathMap() {
       sizeDiff(el: Element) {
         const node = this.get(el);
         if (node == null) return false;
-        const currSize = getStyle(el).borderBox;
+        const currSize = getStyle(el, 'borderBox');
         this.set({ ...node, prevSize: currSize });
         return node.prevSize !== currSize;
       },
@@ -122,7 +122,7 @@ function useColumnsMap() {
   }, []);
 }
 
-interface PaginatorNestedProps {
+interface PaginatorProps {
   structure: Structure;
   pageWidth: number;
 }
@@ -164,10 +164,10 @@ export function useSubscribers(): SubContextObject {
   return React.useContext(SubscribersContext);
 }
 
-export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
+export function Paginator({ structure, pageWidth }: PaginatorProps) {
   const [loading, setLoading] = React.useState(true);
   const columnsMap = useColumnsMap();
-  const nodesMap = useNodePathMap();
+  const nodesMap = useNodesMap();
 
   function init(schema: Schema): Schema {
     schema = structure.map((column, columnIndex) => {
@@ -199,34 +199,6 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
     }
   }
 
-  const findSlice = React.useCallback((path: Path, schema: Schema) => {
-    const [columnIndex, fieldIndex] = path;
-    const column = schema[columnIndex];
-    let pageIt = 0;
-    let sliceIt = column[pageIt].length - 1;
-    let page = 0;
-    let slice = 0;
-
-    while (pageIt < column.length && sliceIt >= 0) {
-      if (column[pageIt][sliceIt].path[ROOT_NODE] === fieldIndex) {
-        page = column[pageIt][sliceIt].leadPage;
-        slice = column[page].findIndex((value) => {
-          return value.path[ROOT_NODE] === fieldIndex;
-        });
-        return [page, slice];
-      }
-
-      if (column[pageIt][sliceIt].path[ROOT_NODE] < fieldIndex) {
-        pageIt++;
-        sliceIt = column[pageIt].length - 1;
-      } else {
-        sliceIt--;
-      }
-    }
-
-    return [page, slice];
-  }, []);
-
   const boxOverflow = React.useCallback(
     (state: State, page: SchemaPage, column: SchemaColumn, box: keyof PartialStyle<number>) => {
       let currentBox = box === 'rowGap' ? state.parentStyle[box] : state.style[box];
@@ -241,7 +213,7 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
         }
 
         if (box === 'marginBottom' && state.nextSibEl != null) {
-          const { marginTop } = getStyle(state.nextSibEl);
+          const marginTop = getStyle(state.nextSibEl, 'marginTop');
           currentBox = marginTop > currentBox ? marginTop : currentBox;
         }
       }
@@ -259,7 +231,7 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
         }
 
         if (box === 'borderBox') {
-          const pageHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!).contentBox;
+          const pageHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!, 'contentBox');
           assert(
             currentBox <= pageHeight,
             'A <Field> of with content prop = block received a element with height greater than the page',
@@ -291,7 +263,7 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
         page.length = 0;
         state.addedHeight = 0;
         state.upperBound = state.lowerBound;
-        state.freeHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!).contentBox;
+        state.freeHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!, 'contentBox');
       }
     },
     [columnsMap],
@@ -507,7 +479,7 @@ export function Paginator({ structure, pageWidth }: PaginatorNestedProps) {
               <Page
                 columns={columns}
                 structure={structure}
-                index={index}
+                pageIndex={index}
                 loading={loading}
                 key={index}
               />

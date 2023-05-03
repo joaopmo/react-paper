@@ -1,9 +1,6 @@
 import React from 'react';
 import { loremIpsum } from 'lorem-ipsum';
-import { Level, useRegister } from '../src/components/Level';
-import { Paper } from '../src/components/Paper';
-import { Column } from '../src';
-import { Node } from '../src/components/Node';
+import { Level, useRegister, Paper, Column, Node } from '../src';
 import '../src/styles/base.css';
 import '../src/styles/print.css';
 
@@ -23,15 +20,15 @@ const style = {
 const Text = function Content({ children }: { children?: React.ReactNode }) {
   const [internalText, setInternalText] = React.useState(text);
 
-  React.useEffect(() => {
-    setTimeout(() => {
-      setInternalText((prevText) => {
-        return prevText + ' ' + text2;
-      });
-    }, 5000);
-  }, []);
+  // React.useEffect(() => {
+  //   setTimeout(() => {
+  //     setInternalText((prevText) => {
+  //       return prevText + ' ' + text2;
+  //     });
+  //   }, 5000);
+  // }, []);
 
-  const register = useRegister();
+  const { register } = useRegister();
 
   return (
     <div {...register()} style={style}>
@@ -51,7 +48,7 @@ const images = [
 const link = images[getRandomInt(4)];
 
 function Image() {
-  const register = useRegister();
+  const { register } = useRegister();
 
   return (
     <div

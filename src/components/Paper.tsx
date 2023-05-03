@@ -14,7 +14,7 @@ export function Paper({ children, pageWidth = 0.6 }: PaperNestedProps): JSX.Elem
   const iterate = React.useCallback(
     (children: React.ReactNode, structure: Structure, index: number = 0) => {
       React.Children.forEach(children, (child, childIndex) => {
-        assert(React.isValidElement(child), `Column ${childIndex} is an invalid React Element`);
+        assert(React.isValidElement(child), `Invalid React Element Detected`);
 
         switch (child.type) {
           case Column:
@@ -23,12 +23,16 @@ export function Paper({ children, pageWidth = 0.6 }: PaperNestedProps): JSX.Elem
           case Level:
             iterate(child.props.children, structure, index);
             return;
-          case Node:
+          case Node: {
+            assert(
+              child.props.element != null,
+              `A <Node> component is lacking the required element prop`,
+            );
             return structure[index].push({
               element: child.props.element ?? null,
               content: child.props.content ?? 'text',
-              children: null,
             });
+          }
           default:
             assert(
               false,

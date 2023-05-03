@@ -6,13 +6,6 @@ import { Spinner } from './Spinner';
 import { type SchemaPage, type Structure } from '../types';
 import { useSubscribers } from './Paginator';
 
-interface PageNestedProps {
-  structure: Structure;
-  columns: Array<SchemaPage | null>;
-  index: number;
-  loading: boolean;
-}
-
 interface ColumnProps {
   column: SchemaPage | null;
   structure: Structure;
@@ -44,7 +37,7 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
             <div style={{ position: 'relative', top }}>
               <LevelProvider
                 path={slice.path}
-                content={structure[slice.path[0]][slice.path[1]].content ?? 'text'}
+                content={structure[slice.path[0]][slice.path[1]].content}
                 subscribe={slice.current === 0}
               >
                 {structure[slice.path[0]][slice.path[1]].element}
@@ -57,17 +50,24 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
   );
 }
 
+interface PageProps {
+  structure: Structure;
+  columns: Array<SchemaPage | null>;
+  pageIndex: number;
+  loading: boolean;
+}
+
 export const Page = React.memo(function PageNested({
   columns,
   structure,
-  index,
+  pageIndex,
   loading,
-}: PageNestedProps): JSX.Element {
+}: PageProps): JSX.Element {
   const { scale, ...dimension } = useDimension();
 
   return (
     <div
-      className="rp-page"
+      className={`rp-page rp-page-${pageIndex}`}
       style={{
         transform: `scale(${scale})`,
         ...dimension,
@@ -81,7 +81,7 @@ export const Page = React.memo(function PageNested({
           <Column
             column={column}
             structure={structure}
-            pageIndex={index}
+            pageIndex={pageIndex}
             columnIndex={columnIndex}
             key={columnIndex}
           />

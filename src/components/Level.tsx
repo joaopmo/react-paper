@@ -4,8 +4,8 @@ import { Node } from './Node';
 import { type Path } from '../types';
 import { useSubscribers } from './Paginator';
 
-export interface Register {
-  ref: ((arg: Element | null) => void) | null | React.MutableRefObject<null>;
+interface Register {
+  ref: React.MutableRefObject<null> | null;
   'data-rp': string;
 }
 interface LevelContextObject {
@@ -25,7 +25,8 @@ function useLevelContext() {
 }
 
 export function useRegister() {
-  return React.useContext(LevelContext).register;
+  const { register } = React.useContext(LevelContext);
+  return { register };
 }
 
 interface LevelProviderProps {
@@ -51,7 +52,7 @@ export const LevelProvider = React.memo(function LevelProvider({
         children: 0,
         content: content ?? 'text',
         element: ref.current,
-        prevSize: getStyle(ref.current).borderBox, // TODO: check
+        prevSize: getStyle(ref.current, 'borderBox'),
       });
     }
   }, [subNode, path, subscribe]);
@@ -69,32 +70,46 @@ interface LevelProps {
   children: React.ReactNode;
 }
 
+interface ReduceJSX {
+  nodes: JSX.Element[];
+  index: number;
+}
+
 export function Level({ children }: LevelProps) {
   const { path: parentPath, subscribe } = useLevelContext();
 
-  let index = 0;
-  const nodes = React.Children.map(children, (child) => {
-    if (!React.isValidElement(child)) {
-      return null;
-    }
+  const { nodes } = React.Children.toArray(children).reduce<ReduceJSX>(
+    (acc, child) => {
+      if (!React.isValidElement(child)) return acc;
 
-    assert(
-      child.type === Node,
-      `[${
-        typeof child.type === 'string' ? child.type : child.type.name
-      }] is not a <Node> component. All component children of <Level> must be a <Node>`,
-    );
+      assert(
+        child.type === Node,
+        `[${
+          typeof child.type === 'string' ? child.type : child.type.name
+        }] is not a <Node> component. All component children of <Level> must be a <Node>`,
+      );
 
-    return (
-      <LevelProvider
-        path={[...parentPath, index++]}
-        content={child.props.content}
-        subscribe={subscribe}
-      >
-        {child.props.element}
-      </LevelProvider>
-    );
-  });
+      assert(
+        child.props.element != null,
+        `A <Node> component is lacking the required element prop`,
+      );
 
-  return <>{nodes ?? null}</>;
+      acc.nodes.push(
+        <LevelProvider
+          path={[...parentPath, acc.index]}
+          content={child.props.content}
+          subscribe={subscribe}
+          key={acc.index}
+        >
+          {child.props.element}
+        </LevelProvider>,
+      );
+
+      acc.index++;
+      return acc;
+    },
+    { nodes: [], index: 0 },
+  );
+
+  return <>{nodes}</>;
 }
