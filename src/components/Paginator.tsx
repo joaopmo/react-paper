@@ -250,14 +250,16 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
           state.leadPage = column.length;
         }
 
-        page.push({
-          path: state.currPath.slice(0, 2),
-          current: state.currSlice++,
-          leadPage: state.leadPage,
-          addedHeight: state.addedHeight,
-          upperBound: state.upperBound,
-          lowerBound: state.lowerBound,
-        });
+        if (state.upperBound !== state.lowerBound) {
+          page.push({
+            path: state.currPath.slice(0, 2),
+            current: state.currSlice++,
+            leadPage: state.leadPage,
+            addedHeight: state.addedHeight,
+            upperBound: state.upperBound,
+            lowerBound: state.lowerBound,
+          });
+        }
 
         column.push([...page]);
         page.length = 0;
