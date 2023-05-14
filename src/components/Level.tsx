@@ -6,16 +6,17 @@ import { useSubscribers } from './Paginator';
 
 interface Register {
   ref: React.MutableRefObject<null> | null;
-  'data-rp': string;
+  'data-rp-id': string;
+  'data-rp-display': string;
 }
 interface LevelContextObject {
-  register: () => Register;
+  register: (display?: boolean) => Register;
   path: Path;
   subscribe: boolean;
 }
 
 const LevelContext = React.createContext<LevelContextObject>({
-  register: () => ({ ref: null, 'data-rp': '' }),
+  register: () => ({ ref: null, 'data-rp-id': '', 'data-rp-display': 'visible' }),
   path: [],
   subscribe: false,
 });
@@ -57,9 +58,16 @@ export const LevelProvider = React.memo(function LevelProvider({
     }
   }, [subNode, path, subscribe, content]);
 
-  const register = React.useCallback((): Register => {
-    return { ref, 'data-rp': path.join('.') };
-  }, [path]);
+  const register = React.useCallback(
+    (display = true): Register => {
+      return {
+        ref,
+        'data-rp-id': path.join('.'),
+        'data-rp-display': display ? 'visible' : 'none',
+      };
+    },
+    [path],
+  );
 
   return (
     <LevelContext.Provider value={{ register, path, subscribe }}>{children}</LevelContext.Provider>
@@ -70,46 +78,55 @@ interface LevelProps {
   children: React.ReactNode;
 }
 
-interface ReduceJSX {
-  nodes: JSX.Element[];
-  index: number;
-}
-
 export function Level({ children }: LevelProps) {
   const { path: parentPath, subscribe } = useLevelContext();
 
-  const { nodes } = React.Children.toArray(children).reduce<ReduceJSX>(
-    (acc, child) => {
-      if (!React.isValidElement(child)) return acc;
+  const nodesFromChildren = React.useCallback(
+    (children: React.ReactNode, parentIndex: number = 0) => {
+      const nodes: JSX.Element[] = [];
 
-      assert(
-        child.type === Node,
-        `[${
-          typeof child.type === 'string' ? child.type : child.type.name
-        }] is not a <Node> component. All component children of <Level> must be a <Node>`,
-      );
+      React.Children.forEach(children, (child) => {
+        if (!React.isValidElement(child)) {
+          return;
+        }
 
-      assert(
-        child.props.element != null,
-        `A <Node> component is lacking the required element prop`,
-      );
+        if (child.type === React.Fragment) {
+          nodes.push(...nodesFromChildren(child.props.children, parentIndex + nodes.length));
+          return;
+        }
 
-      acc.nodes.push(
-        <LevelProvider
-          path={[...parentPath, acc.index]}
-          content={child.props.content}
-          subscribe={subscribe}
-          key={acc.index}
-        >
-          {child.props.element}
-        </LevelProvider>,
-      );
+        assert(
+          child.type === Node,
+          `[${
+            typeof child.type === 'string' ? child.type : child.type.name
+          }] is not a <Node> component. All component children of <Level> must be a <Node>  or <React.Fragment>`,
+        );
 
-      acc.index++;
-      return acc;
+        assert(
+          React.isValidElement(child.props.element),
+          `The element prop of a <Node> must be a valid React Element`,
+        );
+
+        nodes.push(
+          <LevelProvider
+            path={[...parentPath, parentIndex + nodes.length]}
+            content={child.props.content}
+            subscribe={subscribe}
+            key={parentIndex + nodes.length}
+          >
+            {child.props.element}
+          </LevelProvider>,
+        );
+      });
+
+      return nodes;
     },
-    { nodes: [], index: 0 },
+    [parentPath, subscribe],
   );
+
+  const nodes = React.useMemo(() => {
+    return nodesFromChildren(children);
+  }, [children, nodesFromChildren]);
 
   return <>{nodes}</>;
 }

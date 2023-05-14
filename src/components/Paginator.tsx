@@ -14,7 +14,7 @@ import {
 } from '../types';
 
 const COLUMN = 0;
-const ROOT_NODE = 1;
+const ROOT = 1;
 
 export interface Node {
   path: Path;
@@ -59,6 +59,19 @@ function useNodesMap() {
         this.set({ ...node, prevSize: currSize });
         return node.prevSize !== currSize;
       },
+      hasParents(el: Element) {
+        const node = this.get(el);
+        if (node == null) return false;
+        for (let i = node.path.length - 1; i >= 2; i--) {
+          if (!this.has(node.path.slice(0, i))) {
+            return false;
+          }
+        }
+        return true;
+      },
+      has(path: Path) {
+        return pathToNode.current.has(path.join('.'));
+      },
       get(key: Element | Path) {
         if (Array.isArray(key)) {
           const children = pathToChildren.current.get(key.join('.'));
@@ -77,7 +90,7 @@ function useNodesMap() {
             if (
               node.element.isEqualNode(key) ||
               node.element === key ||
-              node.element.getAttribute('data-rp') === key.getAttribute('data-rp')
+              node.element.getAttribute('data-rp-id') === key.getAttribute('data-rp-id')
             ) {
               const children = pathToChildren.current.get(node.path.join('.'));
               if (children != null) {
@@ -92,6 +105,9 @@ function useNodesMap() {
 
           return undefined;
         }
+      },
+      childCount(path: Path) {
+        return pathToChildren.current.get(path.join('.'));
       },
       delete(node: Node) {
         pathToNode.current.delete(node.path.join('.'));
@@ -138,13 +154,16 @@ export interface State {
   freeHeight: number;
   field: Node;
   style: Style<number>;
-  parentStyle: Style<number>;
+  parentStyle: {
+    rowGap: Style<number>['rowGap'];
+    display: Style<number>['display'];
+  };
   prevSibEl?: Element;
   nextSibEl?: Element;
 }
 
 export interface SubContextObject {
-  subNode: ((node: Node) => () => void) | null;
+  subNode: ((node: Node) => (() => void) | undefined) | null;
   subColumn: ((el: Element, columnIndex: number) => void) | null;
 }
 
@@ -164,8 +183,9 @@ export function useSubscribers(): SubContextObject {
   return React.useContext(SubscribersContext);
 }
 
-export function Paginator({ structure, pageWidth }: PaginatorProps) {
+function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   const [loading, setLoading] = React.useState(true);
+  const [lastChanges, setLastChanges] = React.useState(new Map());
   const columnsMap = useColumnsMap();
   const nodesMap = useNodesMap();
 
@@ -199,6 +219,21 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
     }
   }
 
+  const pushPage = React.useCallback((state: State, page: SchemaPage, column: SchemaColumn) => {
+    if (state.currSlice === 0) {
+      state.leadPage = column.length;
+    }
+
+    page.push({
+      path: state.currPath.slice(0, 2),
+      current: state.currSlice++,
+      leadPage: state.leadPage,
+      addedHeight: state.addedHeight,
+      upperBound: state.upperBound,
+      lowerBound: state.lowerBound,
+    });
+  }, []);
+
   const boxOverflow = React.useCallback(
     (state: State, page: SchemaPage, column: SchemaColumn, box: keyof PartialStyle<number>) => {
       let currentBox = box === 'rowGap' ? state.parentStyle[box] : state.style[box];
@@ -226,7 +261,7 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
         if (state.freeHeight >= currentBox) {
           state.freeHeight = state.freeHeight - currentBox;
           state.addedHeight = state.addedHeight + currentBox;
-          if (box !== 'rowGap') state.lowerBound = state.lowerBound + currentBox;
+          state.lowerBound = state.lowerBound + currentBox;
           break;
         }
 
@@ -246,19 +281,8 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
           currentBox = currentBox - cap;
         }
 
-        if (state.currSlice === 0) {
-          state.leadPage = column.length;
-        }
-
         if (state.upperBound !== state.lowerBound) {
-          page.push({
-            path: state.currPath.slice(0, 2),
-            current: state.currSlice++,
-            leadPage: state.leadPage,
-            addedHeight: state.addedHeight,
-            upperBound: state.upperBound,
-            lowerBound: state.lowerBound,
-          });
+          pushPage(state, page, column);
         }
 
         column.push([...page]);
@@ -268,50 +292,82 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
         state.freeHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!, 'contentBox');
       }
     },
-    [columnsMap],
+    [columnsMap, pushPage],
+  );
+
+  const findPrevVisibleSib = React.useCallback(
+    (path: Path) => {
+      const parentPath = path.slice(0, -1);
+
+      for (let i = path.at(-1)! - 1; i >= 0; i--) {
+        const sibling = nodesMap.get([...parentPath, i])!;
+        const siblingDisplay = getStyle(sibling.element, 'display');
+        if (siblingDisplay !== 'none') {
+          return sibling.element;
+        }
+      }
+
+      return undefined;
+    },
+    [nodesMap],
+  );
+
+  const findNextVisibleSib = React.useCallback(
+    (path: Path) => {
+      const parentPath = path.slice(0, -1);
+      const siblingsCount = nodesMap.childCount(parentPath)!;
+
+      for (let i = path.at(-1)! + 1; i < siblingsCount; i++) {
+        const sibling = nodesMap.get([...parentPath, i])!;
+        const siblingDisplay = getStyle(sibling.element, 'display');
+        if (siblingDisplay !== 'none') {
+          return sibling.element;
+        }
+      }
+
+      return undefined;
+    },
+    [nodesMap],
   );
 
   const allocate = React.useCallback(
     (path: Path) => {
       const page: SchemaPage = [];
       const column: SchemaColumn = [];
-      const parentStyle = getStyle(columnsMap.get(path[COLUMN])!);
-      const addedHeight = 0;
-      const freeHeight = parentStyle.contentBox;
+
+      const freeHeight = getStyle(columnsMap.get(path[COLUMN])!, 'contentBox');
+      const field = nodesMap.get(path) as Node;
+      const columnStyle: State['parentStyle'] = {
+        rowGap: getStyle(columnsMap.get(path[COLUMN])!, 'rowGap'),
+        display: getStyle(columnsMap.get(path[COLUMN])!, 'display'),
+      };
 
       const state: State = {
+        field,
+        freeHeight,
         prevPath: [],
         currPath: path,
         leadPage: 0,
         currSlice: 0,
         upperBound: 0,
         lowerBound: 0,
-        addedHeight,
-        freeHeight,
-        parentStyle,
-        style: getStyle((nodesMap.get(path) as Node).element),
-        field: nodesMap.get(path) as Node,
+        addedHeight: 0,
+        parentStyle: columnStyle,
+        style: getStyle(field.element),
       };
 
       const pathStack: Path[] = [];
-      for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT_NODE]; i--) {
+      for (let i = structure[path[COLUMN]].length - 1; i >= path[ROOT]; i--) {
         pathStack.push([path[COLUMN], i]);
       }
 
       while (pathStack.length > 0) {
         state.currPath = pathStack.pop()!;
-        const parentPath = state.currPath.slice(0, -1);
         state.field = nodesMap.get(state.currPath) as Node;
-        state.style = getStyle((nodesMap.get(state.currPath) as Node).element);
+        state.style = getStyle(state.field.element);
 
-        // If currPath is a root node, then the parent is the column
-        if (parentPath.length === 1) state.parentStyle = parentStyle;
-        else state.parentStyle = getStyle((nodesMap.get(parentPath) as Node).element);
-        state.prevSibEl = nodesMap.get([...parentPath, state.currPath.at(-1)! - 1])?.element;
-        state.nextSibEl = nodesMap.get([...parentPath, state.currPath.at(-1)! + 1])?.element;
-
-        const prevRoot = state.prevPath[ROOT_NODE];
-        const currRoot = state.currPath[ROOT_NODE];
+        const prevRoot = state.prevPath[ROOT];
+        const currRoot = state.currPath[ROOT];
         const rootHasChanged = prevRoot != null && prevRoot !== currRoot;
 
         if (rootHasChanged) {
@@ -324,6 +380,21 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
             state.lowerBound = 0;
           }
         }
+
+        if (state.style.display === 'none') {
+          if (state.currPath.length === 2) {
+            pushPage(state, page, column);
+          }
+          state.prevPath = [...state.currPath];
+          continue;
+        }
+
+        const parentPath = state.currPath.slice(0, -1);
+        // If currPath is a root node, then the parent is the column
+        if (parentPath.length === 1) state.parentStyle = columnStyle;
+        else state.parentStyle = getStyle((nodesMap.get(parentPath) as Node).element);
+        state.prevSibEl = findPrevVisibleSib(state.currPath);
+        state.nextSibEl = findNextVisibleSib(state.currPath);
 
         if (state.field.content === 'text' && state.prevPath.length <= state.currPath.length) {
           boxOverflow(state, page, column, 'marginTop');
@@ -354,23 +425,12 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
 
         boxOverflow(state, page, column, 'marginBottom');
 
-        if (state.parentStyle.display === 'flex') {
+        if (state.parentStyle.display === 'flex' && state.nextSibEl != null) {
           boxOverflow(state, page, column, 'rowGap');
         }
 
-        if (state.currSlice === 0) {
-          state.leadPage = column.length;
-        }
-
         if (state.currPath.length === 2) {
-          page.push({
-            path: state.currPath.slice(0, 2),
-            current: state.currSlice++,
-            leadPage: state.leadPage,
-            addedHeight: state.addedHeight,
-            upperBound: state.upperBound,
-            lowerBound: state.lowerBound,
-          });
+          pushPage(state, page, column);
         }
 
         state.prevPath = [...state.currPath];
@@ -382,7 +442,15 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
 
       return column;
     },
-    [columnsMap, nodesMap, structure, boxOverflow],
+    [
+      columnsMap,
+      nodesMap,
+      structure,
+      findPrevVisibleSib,
+      findNextVisibleSib,
+      boxOverflow,
+      pushPage,
+    ],
   );
 
   const calcPosition = React.useCallback(
@@ -390,8 +458,10 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
       const schema = structuredClone(oldSchema);
       if (changes == null) {
         changes = new Map();
-        structure.forEach((_, columnIndex) => {
-          changes?.set(columnIndex, [columnIndex, 0]);
+        structure.forEach((column, columnIndex) => {
+          if (column.length > 0 && changes instanceof Map) {
+            changes.set(columnIndex, [columnIndex, 0]);
+          }
         });
       }
 
@@ -410,16 +480,16 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
     (entries: ResizeObserverEntry[]) => {
       const changes = entries.reduce((acc, { target: el }) => {
         if (!nodesMap.sizeDiff(el)) return acc;
+        if (!nodesMap.hasParents(el)) return acc;
         const path = (nodesMap.get(el) as Node).path;
         acc.set(path[COLUMN], [path[COLUMN], 0]);
         return acc;
       }, new Map<number, Path>());
 
-      if (changes.size === 0) return;
-
-      setLoading(true);
-      dispatch({ type: 'resize', payload: {} });
-      setLoading(false);
+      if (changes.size > 0) {
+        setLoading(true);
+        setLastChanges(changes);
+      }
     },
     [nodesMap],
   );
@@ -430,9 +500,6 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
       observe(node: Node) {
         resize.observe(node.element, { box: 'border-box' });
       },
-      unobserve(node: Node) {
-        resize.unobserve(node.element);
-      },
       disconnect() {
         resize.disconnect();
       },
@@ -441,14 +508,15 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
 
   const subNode = React.useCallback(
     (node: Node) => {
-      nodesMap.set(node);
-      if (node.path.length === 2) {
+      const prevNode = nodesMap.get(node.path);
+      if (prevNode == null || !prevNode.element.isEqualNode(node.element)) {
+        nodesMap.set(node);
         observer.observe(node);
-      }
 
-      return function unsubscribe() {
-        nodesMap.delete(node);
-      };
+        return function unsubscribe() {
+          nodesMap.delete(node);
+        };
+      }
     },
     [nodesMap, observer],
   );
@@ -461,14 +529,18 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
   );
 
   React.useEffect(() => {
-    dispatch({ type: 'reset', payload: {} });
-  }, [structure]);
+    if (lastChanges.size > 0) {
+      dispatch({ type: 'resize', payload: { changes: lastChanges } });
+      setLastChanges(new Map());
+      setLoading(false);
+    }
+  }, [lastChanges]);
 
-  React.useEffect(() => {
-    return () => {
-      observer.disconnect();
-    };
-  }, [observer]);
+  React.useMemo(() => {
+    dispatch({ type: 'reset', payload: {} });
+    observer.disconnect();
+    // eslint-disable-next-line
+  }, [observer, structure]);
 
   const zipped = React.useMemo(() => zip(schema), [schema]);
 
@@ -491,4 +563,30 @@ export function Paginator({ structure, pageWidth }: PaginatorProps) {
       </DimensionProvider>
     </SubscribersContext.Provider>
   );
+}
+
+export const Paginator = React.memo(PaginatorBase, arePropsEqual);
+
+function arePropsEqual(oldProps: PaginatorProps, newProps: PaginatorProps) {
+  if (oldProps.pageWidth !== newProps.pageWidth) {
+    return false;
+  }
+
+  if (oldProps.structure.length !== newProps.structure.length) {
+    return false;
+  }
+
+  for (let i = 0; i < oldProps.structure.length; i++) {
+    if (oldProps.structure[i].length !== newProps.structure[i].length) {
+      return false;
+    }
+
+    for (let j = 0; j < oldProps.structure[i].length; j++) {
+      if (oldProps.structure[i][j].rootKey !== newProps.structure[i][j].rootKey) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }

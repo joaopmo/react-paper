@@ -22,7 +22,7 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
         subColumn(el, columnIndex);
       }
     },
-    [pageIndex],
+    [columnIndex, pageIndex, subColumn],
   );
 
   return (
@@ -33,7 +33,10 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
         const top = -slice.upperBound;
 
         return (
-          <div style={{ overflow: 'hidden', maxHeight }} key={`${slice.path.join('.')}`}>
+          <div
+            style={{ overflow: 'hidden', maxHeight }}
+            key={structure[slice.path[0]][slice.path[1]].rootKey}
+          >
             <div style={{ position: 'relative', top }}>
               <LevelProvider
                 path={slice.path}
@@ -57,7 +60,7 @@ interface PageProps {
   loading: boolean;
 }
 
-export const Page = React.memo(function PageNested({
+export const Page = React.memo(function Page({
   columns,
   structure,
   pageIndex,

@@ -46,14 +46,15 @@ function unwrapBorders({
   };
 }
 
-function getPartialStyle(el: Element, props: BoxSizing): BoxSizing;
-
-function getPartialStyle(el: Element, props: Display): Display;
-
 function getPartialStyle(
   el: Element,
   props: FilledStyle<string>,
 ): Record<keyof typeof props, number>;
+
+function getPartialStyle(el: Element, props: BoxSizing): BoxSizing;
+
+function getPartialStyle(el: Element, props: Display): Display;
+
 function getPartialStyle(el: Element, props: StringOrFilledStyle): unknown {
   const style = window.getComputedStyle(el);
 
@@ -80,13 +81,31 @@ function getPartialStyle(el: Element, props: StringOrFilledStyle): unknown {
   );
 }
 
-export function getStyle(el: Element, property: keyof PartialStyle<string>): number;
+type StringOrPartialStyleKeys = keyof PartialStyle<string> | keyof BoxSizing | keyof Display;
+
+export function getStyle(el: Element, prop: keyof PartialStyle<string>): number;
+
+export function getStyle(el: Element, prop: keyof BoxSizing): string;
+
+export function getStyle(el: Element, prop: keyof Display): string;
 
 export function getStyle(el: Element): Style<number>;
-export function getStyle(el: Element, prop?: keyof PartialStyle<string>): number | Style<number> {
+export function getStyle(el: Element, prop?: StringOrPartialStyleKeys): unknown {
+  const boxSizing: BoxSizing = { boxSizing: 'box-sizing' };
+  const display: Display = { display: 'display' };
+
   if (prop != null) {
-    let { [prop]: value } = getPartialStyle(el, { [prop]: baseProperties[prop] });
-    const boxSizing: BoxSizing = { boxSizing: 'box-sizing' };
+    if (prop === 'boxSizing') {
+      return getPartialStyle(el, boxSizing).boxSizing;
+    }
+
+    if (prop === 'display') {
+      return getPartialStyle(el, display).display;
+    }
+
+    let { [prop]: value } = getPartialStyle(el, {
+      [prop]: baseProperties[prop],
+    });
 
     if (prop === 'contentBox' && getPartialStyle(el, boxSizing).boxSizing === 'border-box') {
       const borders = getPartialStyle(el, unwrapBorders(baseProperties));
@@ -107,8 +126,8 @@ export function getStyle(el: Element, prop?: keyof PartialStyle<string>): number
 
   const partialSizes = getPartialStyle(el, baseProperties);
 
-  const { display } = getPartialStyle(el, { display: 'display' });
-  const sizes: Style<number> = { ...partialSizes, display };
+  const { display: displayValue } = getPartialStyle(el, display);
+  const sizes: Style<number> = { ...partialSizes, display: displayValue };
 
   if (getPartialStyle(el, { boxSizing: 'box-sizing' }).boxSizing === 'border-box') {
     sizes.contentBox -= sizes.paddingTop + sizes.paddingBottom;

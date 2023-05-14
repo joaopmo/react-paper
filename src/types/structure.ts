@@ -1,8 +1,9 @@
-export interface StructureNode {
+export interface StructureRoot {
   content: 'block' | 'text';
-  element: JSX.Element | null;
+  element: JSX.Element;
+  rootKey: string;
 }
 
-export type StructureColumn = StructureNode[];
+export type StructureColumn = StructureRoot[];
 
 export type Structure = StructureColumn[];

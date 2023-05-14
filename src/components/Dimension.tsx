@@ -64,7 +64,18 @@ export function DimensionProvider({
       const marginRight = width * scale - width;
       const marginBottom = height * scale - height;
 
-      setDimensions({ scale, marginRight, marginBottom, height, width });
+      setDimensions((prevState) => {
+        switch (true) {
+          case prevState.scale !== scale:
+          case prevState.marginRight !== marginRight:
+          case prevState.marginBottom !== marginBottom:
+          case prevState.height !== height:
+          case prevState.width !== width:
+            return { scale, marginRight, marginBottom, height, width };
+          default:
+            return prevState;
+        }
+      });
     }
   }, [dimensionRef, widthFrac, multiplier]);
 
