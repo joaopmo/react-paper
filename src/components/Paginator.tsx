@@ -528,6 +528,13 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
     [columnsMap],
   );
 
+  React.useMemo(() => {
+    setLastChanges(new Map<number, Path>());
+    dispatch({ type: 'reset', payload: {} });
+    observer.disconnect();
+    // eslint-disable-next-line
+  }, [observer, structure]);
+
   React.useEffect(() => {
     if (lastChanges.size > 0) {
       dispatch({ type: 'resize', payload: { changes: lastChanges } });
@@ -535,12 +542,6 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       setLoading(false);
     }
   }, [lastChanges]);
-
-  React.useMemo(() => {
-    dispatch({ type: 'reset', payload: {} });
-    observer.disconnect();
-    // eslint-disable-next-line
-  }, [observer, structure]);
 
   const zipped = React.useMemo(() => zip(schema), [schema]);
 
