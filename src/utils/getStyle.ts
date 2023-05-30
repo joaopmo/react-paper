@@ -3,6 +3,7 @@ import { type AtLeastOne, type PartialStyle, type Style } from '../types';
 const baseProperties: PartialStyle<string> = {
   borderBox: 'height',
   contentBox: 'height',
+  marginBox: 'height',
   rowGap: 'row-gap',
   lineHeight: 'line-height',
   marginTop: 'margin-top',
@@ -43,6 +44,23 @@ function unwrapBorders({
     paddingBottom,
     borderTop,
     borderBottom,
+  };
+}
+function unwrapMargins({
+  paddingTop,
+  paddingBottom,
+  borderTop,
+  borderBottom,
+  marginTop,
+  marginBottom,
+}: FilledStyle<string>) {
+  return {
+    paddingTop,
+    paddingBottom,
+    borderTop,
+    borderBottom,
+    marginTop,
+    marginBottom,
   };
 }
 
@@ -119,6 +137,19 @@ export function getStyle(el: Element, prop?: StringOrPartialStyleKeys): unknown 
       Object.values(borders).forEach((border: number) => {
         value += border;
       });
+    }
+
+    if (prop === 'marginBox') {
+      const margins = getPartialStyle(el, unwrapMargins(baseProperties));
+
+      if (getPartialStyle(el, boxSizing).boxSizing === 'border-box') {
+        value += margins.marginTop;
+        value += margins.marginBottom;
+      } else {
+        Object.values(margins).forEach((border: number) => {
+          value += border;
+        });
+      }
     }
 
     return value;

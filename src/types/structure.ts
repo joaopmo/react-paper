@@ -1,5 +1,5 @@
 export interface StructureRoot {
-  content: 'block' | 'text';
+  content: 'block' | 'text' | 'parallel';
   element: JSX.Element;
   rootKey: string;
 }

@@ -1,6 +1,7 @@
 export interface PartialStyle<T> {
   contentBox: T;
   borderBox: T;
+  marginBox: T;
   rowGap: T;
   lineHeight: T;
   marginTop: T;

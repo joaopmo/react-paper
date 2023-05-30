@@ -19,7 +19,7 @@ const ROOT = 1;
 export interface Node {
   path: Path;
   children: number;
-  content: 'block' | 'text' | null;
+  content: 'block' | 'text' | 'parallel' | null;
   element: Element;
   prevSize: number;
 }
@@ -184,6 +184,7 @@ export function useSubscribers(): SubContextObject {
 }
 
 function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
+  const reset = React.useRef(false);
   const [loading, setLoading] = React.useState(true);
   const [lastChanges, setLastChanges] = React.useState(new Map());
   const columnsMap = useColumnsMap();
@@ -330,6 +331,26 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
     [nodesMap],
   );
 
+  const maxSizeParallelSibPath = React.useCallback(
+    (path: Path): Path => {
+      const parentField = nodesMap.get(path) as Node;
+      let maxSize = 0;
+      let maxIndex = 0;
+
+      for (let i = 0; i < parentField.children; i++) {
+        const currField = nodesMap.get([...path, i]) as Node;
+        const currSize = getStyle(currField.element, 'marginBox');
+        if (currSize > maxSize) {
+          maxSize = currSize;
+          maxIndex = i;
+        }
+      }
+
+      return [...path, maxIndex];
+    },
+    [nodesMap],
+  );
+
   const allocate = React.useCallback(
     (path: Path) => {
       const page: SchemaPage = [];
@@ -403,9 +424,16 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
           if (state.field.children !== 0) {
             pathStack.push([...state.currPath]);
-            for (let i = state.field.children - 1; i >= 0; i--) {
-              pathStack.push([...state.currPath, i]);
+            const firstChildField = nodesMap.get([...state.currPath, 0]) as Node;
+
+            if (firstChildField.content === 'parallel') {
+              pathStack.push(maxSizeParallelSibPath(state.currPath));
+            } else {
+              for (let i = state.field.children - 1; i >= 0; i--) {
+                pathStack.push([...state.currPath, i]);
+              }
             }
+
             state.prevPath = [...state.currPath];
             continue;
           }
@@ -418,7 +446,7 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
           boxOverflow(state, page, column, 'borderBottom');
         }
 
-        if (state.field.content === 'block') {
+        if (state.field.content === 'block' || state.field.content === 'parallel') {
           boxOverflow(state, page, column, 'marginTop');
           boxOverflow(state, page, column, 'borderBox');
         }
@@ -450,6 +478,7 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       findNextVisibleSib,
       boxOverflow,
       pushPage,
+      maxSizeParallelSibPath,
     ],
   );
 
@@ -478,6 +507,7 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
   const resizeHandler = React.useCallback(
     (entries: ResizeObserverEntry[]) => {
+      console.log('resize');
       const changes = entries.reduce((acc, { target: el }) => {
         if (!nodesMap.sizeDiff(el)) return acc;
         if (!nodesMap.hasParents(el)) return acc;
@@ -487,6 +517,7 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       }, new Map<number, Path>());
 
       if (changes.size > 0) {
+        reset.current = false;
         setLoading(true);
         setLastChanges(changes);
       }
@@ -529,6 +560,8 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   );
 
   React.useMemo(() => {
+    console.log('memo');
+    reset.current = true;
     setLastChanges(new Map<number, Path>());
     dispatch({ type: 'reset', payload: {} });
     observer.disconnect();
@@ -536,7 +569,8 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   }, [observer, structure]);
 
   React.useEffect(() => {
-    if (lastChanges.size > 0) {
+    console.log('lastChange effect');
+    if (lastChanges.size > 0 && !reset.current) {
       dispatch({ type: 'resize', payload: { changes: lastChanges } });
       setLastChanges(new Map());
       setLoading(false);

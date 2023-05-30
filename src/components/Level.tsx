@@ -33,7 +33,7 @@ export function useRegister() {
 interface LevelProviderProps {
   path: Path;
   children: React.ReactNode;
-  content: 'block' | 'text' | null;
+  content: 'block' | 'text' | 'parallel' | null;
   subscribe: boolean;
 }
 
@@ -76,9 +76,10 @@ export const LevelProvider = React.memo(function LevelProvider({
 
 interface LevelProps {
   children: React.ReactNode;
+  parallel?: boolean;
 }
 
-export function Level({ children }: LevelProps) {
+export function Level({ children, parallel = false }: LevelProps) {
   const { path: parentPath, subscribe } = useLevelContext();
 
   const nodesFromChildren = React.useCallback(
@@ -110,7 +111,7 @@ export function Level({ children }: LevelProps) {
         nodes.push(
           <LevelProvider
             path={[...parentPath, parentIndex + nodes.length]}
-            content={child.props.content}
+            content={parallel ? 'parallel' : child.props.content}
             subscribe={subscribe}
             key={parentIndex + nodes.length}
           >
@@ -121,7 +122,7 @@ export function Level({ children }: LevelProps) {
 
       return nodes;
     },
-    [parentPath, subscribe],
+    [parallel, parentPath, subscribe],
   );
 
   const nodes = React.useMemo(() => {
