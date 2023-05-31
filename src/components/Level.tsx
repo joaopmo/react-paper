@@ -1,5 +1,5 @@
 import React from 'react';
-import { assert } from '../utils';
+import { assert, getStyle } from '../utils';
 import { Node } from './Node';
 import { type Path } from '../types';
 import { useSubscribers } from './Paginator';
@@ -16,7 +16,11 @@ interface LevelContextObject {
 }
 
 const LevelContext = React.createContext<LevelContextObject>({
-  register: () => ({ ref: null, 'data-rp-id': '', 'data-rp-display': 'visible' }),
+  register: () => ({
+    ref: null,
+    'data-rp-id': '',
+    'data-rp-display': 'visible',
+  }),
   path: [],
   subscribe: false,
 });
@@ -46,14 +50,14 @@ export const LevelProvider = React.memo(function LevelProvider({
   const { subNode } = useSubscribers();
   const ref = React.useRef(null);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (ref.current != null && subNode != null && subscribe) {
       return subNode({
         path,
         children: 0,
         content: content ?? 'text',
         element: ref.current,
-        prevSize: -1,
+        prevSize: getStyle(ref.current, 'marginBox'),
       });
     }
   }, [subNode, path, subscribe, content]);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { loremIpsum } from 'lorem-ipsum';
-import { Level, useRegister, Paper, Column, Node } from '../src';
+import { Level, useRegister, Paper, Column, Node, Root } from '../src';
 import '../src/styles/base.css';
 import '../src/styles/print.css';
 
@@ -8,34 +8,51 @@ function getRandomInt(max: number) {
   return Math.floor(Math.random() * max);
 }
 
-const text = loremIpsum({ count: 15, units: 'paragraphs' });
-const text2 = loremIpsum({ count: 1, units: 'sentences' });
+const text = loremIpsum({ count: 5, units: 'paragraphs' });
 const style = {
   marginTop: `${getRandomInt(10)}px`,
   marginBottom: `${getRandomInt(10)}px`,
   paddingTop: `${getRandomInt(10)}px`,
   paddingBottom: `${getRandomInt(10)}px`,
+  lineHeight: 1.3,
 };
 
-const Text = function Content({ children }: { children?: React.ReactNode }) {
-  const [internalText, setInternalText] = React.useState(text);
-
-  // React.useEffect(() => {
-  //   setTimeout(() => {
-  //     setInternalText((prevText) => {
-  //       return prevText + ' ' + text2;
-  //     });
-  //   }, 5000);
-  // }, []);
-
+function Text() {
   const { register } = useRegister();
 
   return (
     <div {...register()} style={style}>
-      {children ?? internalText}
+      {text}
     </div>
   );
-};
+}
+
+function TextTwo() {
+  const { register } = useRegister();
+
+  return (
+    <div {...register()} style={{ ...style, color: 'blue' }}>
+      <Level>
+        <Node element={<Text />} />
+        <Node element={<Text />} />
+      </Level>
+    </div>
+  );
+}
+
+function TextThree() {
+  const { register } = useRegister();
+
+  return (
+    <div {...register()} style={{ ...style, color: 'red' }}>
+      <Level>
+        <Node element={<Text />} />
+        <Node element={<Text />} />
+        <Node element={<Text />} />
+      </Level>
+    </div>
+  );
+}
 
 const images = [
   'https://images4.alphacoders.com/973/973967.jpg',
@@ -68,63 +85,23 @@ function Image() {
 }
 
 export const PaperStories = () => {
-  const [firstText, setFirstText] = React.useState<boolean>(true);
+  const [element, setElement] = React.useState<string>('three');
 
-  // React.useEffect(() => {
-  //   setTimeout(() => {
-  //     setFirstText(true);
-  //   }, 10000);
-  // }, []);
+  React.useEffect(() => {
+    setTimeout(() => {
+      setElement('two');
+    }, 5000);
+  }, []);
 
   return (
     <Paper pageWidth={0.7}>
       <Column>
-        <Level>
-          {/* 0.0 */}
-          <Node
-            element={
-              <Text>
-                <Level>
-                  {/* 0.0.0 */}
-                  <Node
-                    element={
-                      <Text>
-                        <Level>
-                          {/* 0.0.0.0 */}
-                          {firstText && <Node element={<Text />} />}
-                          {/* 0.0.0.1 */}
-                          <Node element={<Image />} content="block" />
-                          {/* 0.0.0.2 */}
-                          <Node element={<Image />} content="block" />
-                          {/* 0.0.0.3 */}
-                          <Node element={<Image />} content="block" />
-                          {/* 0.0.0.4 */}
-                          <Node element={<Image />} content="block" />
-                        </Level>
-                      </Text>
-                    }
-                  />
-                  {/* 0.0.1 */}
-                  <Node element={<Image />} content="block" />
-                  {/* 0.0.2 */}
-                  <Node element={<Text />} />
-                </Level>
-              </Text>
-            }
-          />
-        </Level>
-      </Column>
-      <Column>
-        <Level>
-          {/* 1.0 */}
-          <Node element={<Text />} />
-          {/* 1.1 */}
-          <Node element={<Image />} content="block" />
-          {/* 1.2 */}
-          <Node element={<Image />} content="block" />
-          {/* 1.3 */}
-          <Node element={<Text />} />
-        </Level>
+        <Root element={<TextTwo />} rootKey={'key1' + element} />
+        <Root
+          element={element === 'two' ? <TextTwo /> : <TextThree />}
+          rootKey={'key2' + element}
+        />
+        <Root element={<TextTwo />} rootKey={'key3' + element} />
       </Column>
     </Paper>
   );

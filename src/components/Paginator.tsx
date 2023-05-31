@@ -55,7 +55,7 @@ function useNodesMap() {
       sizeDiff(el: Element) {
         const node = this.get(el);
         if (node == null) return false;
-        const currSize = getStyle(el, 'borderBox');
+        const currSize = getStyle(el, 'marginBox');
         this.set({ ...node, prevSize: currSize });
         return node.prevSize !== currSize;
       },
@@ -72,7 +72,7 @@ function useNodesMap() {
       has(path: Path) {
         return pathToNode.current.has(path.join('.'));
       },
-      get(key: Element | Path) {
+      get(key: Element | Path): Node | undefined {
         if (Array.isArray(key)) {
           const children = pathToChildren.current.get(key.join('.'));
           const node = pathToNode.current.get(key.join('.'));
@@ -184,11 +184,11 @@ export function useSubscribers(): SubContextObject {
 }
 
 function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
-  const reset = React.useRef(false);
   const [loading, setLoading] = React.useState(true);
   const [lastChanges, setLastChanges] = React.useState(new Map());
   const columnsMap = useColumnsMap();
   const nodesMap = useNodesMap();
+  const prevStructureShape = React.useRef<null | number[]>(null);
 
   function init(schema: Schema): Schema {
     schema = structure.map((column, columnIndex) => {
@@ -507,7 +507,6 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
   const resizeHandler = React.useCallback(
     (entries: ResizeObserverEntry[]) => {
-      console.log('resize');
       const changes = entries.reduce((acc, { target: el }) => {
         if (!nodesMap.sizeDiff(el)) return acc;
         if (!nodesMap.hasParents(el)) return acc;
@@ -517,8 +516,6 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       }, new Map<number, Path>());
 
       if (changes.size > 0) {
-        reset.current = false;
-        setLoading(true);
         setLastChanges(changes);
       }
     },
@@ -531,21 +528,26 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       observe(node: Node) {
         resize.observe(node.element, { box: 'border-box' });
       },
-      disconnect() {
-        resize.disconnect();
+      unobserve(node: Node) {
+        resize.unobserve(node.element);
       },
     };
   }, [resizeHandler]);
 
   const subNode = React.useCallback(
     (node: Node) => {
-      const prevNode = nodesMap.get(node.path);
-      if (prevNode == null || !prevNode.element.isEqualNode(node.element)) {
+      const prevNode = nodesMap.get(node.element);
+      if (
+        prevNode == null ||
+        prevNode.prevSize !== node.prevSize ||
+        prevNode.path.join('.') !== node.path.join('.')
+      ) {
         nodesMap.set(node);
         observer.observe(node);
 
         return function unsubscribe() {
           nodesMap.delete(node);
+          observer.unobserve(node);
         };
       }
     },
@@ -560,22 +562,31 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   );
 
   React.useMemo(() => {
-    console.log('memo');
-    reset.current = true;
-    setLastChanges(new Map<number, Path>());
-    dispatch({ type: 'reset', payload: {} });
-    observer.disconnect();
-    // eslint-disable-next-line
-  }, [observer, structure]);
+    const currStructureShape = structure.map((column) => column.length);
+    if (
+      prevStructureShape.current == null ||
+      prevStructureShape.current.join('.') !== currStructureShape.join('.')
+    ) {
+      dispatch({ type: 'reset', payload: {} });
+    }
+  }, [structure]);
 
   React.useEffect(() => {
-    console.log('lastChange effect');
-    if (lastChanges.size > 0 && !reset.current) {
+    prevStructureShape.current = structure.map((column) => column.length);
+    dispatch({ type: 'resize', payload: {} });
+  }, [structure]);
+
+  React.useEffect(() => {
+    if (lastChanges.size > 0) {
+      setLoading(true);
       dispatch({ type: 'resize', payload: { changes: lastChanges } });
       setLastChanges(new Map());
-      setLoading(false);
     }
   }, [lastChanges]);
+
+  React.useEffect(() => {
+    setLoading(false);
+  }, [schema]);
 
   const zipped = React.useMemo(() => zip(schema), [schema]);
 
