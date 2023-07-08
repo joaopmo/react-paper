@@ -1,7 +1,7 @@
 export interface StructureRoot {
   content: 'block' | 'text' | 'parallel';
   element: JSX.Element;
-  rootKey: string;
+  rootKey?: string;
 }
 
 export type StructureColumn = StructureRoot[];

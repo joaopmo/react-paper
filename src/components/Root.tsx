@@ -2,7 +2,7 @@ import { assert } from '../utils';
 
 interface RootProps {
   element: JSX.Element;
-  rootKey: string;
+  rootKey?: string;
   content?: 'block' | 'text';
 }
 

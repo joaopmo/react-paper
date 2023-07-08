@@ -1,55 +1,66 @@
 import React from 'react';
-import { assert } from '../utils';
+import { assert, imply } from '../utils';
 import { Column } from './Column';
 import { Root } from './Root';
 import { type Structure, type StructureColumn } from '../types';
-import { Paginator } from './Paginator';
+import { PaginatorBase, PaginatorMemo } from './Paginator';
 interface PaperNestedProps {
   children: React.ReactNode;
   pageWidth: number;
+  memoize: boolean;
 }
 
 function isString(s: any) {
   return typeof s === 'string' || s instanceof String;
 }
 
-export function Paper({ children, pageWidth = 0.6 }: PaperNestedProps): JSX.Element {
-  const rootsFromChildren = React.useCallback((children: React.ReactNode): StructureColumn => {
-    const structure: StructureColumn = [];
+export function Paper({
+  children,
+  pageWidth = 0.6,
+  memoize = false,
+}: PaperNestedProps): JSX.Element {
+  const rootsFromChildren = React.useCallback(
+    (children: React.ReactNode): StructureColumn => {
+      const structure: StructureColumn = [];
 
-    React.Children.forEach(children, (child) => {
-      if (!React.isValidElement(child)) {
-        return;
-      }
+      React.Children.forEach(children, (child) => {
+        if (!React.isValidElement(child)) {
+          return;
+        }
 
-      if (child.type === React.Fragment) {
-        structure.push(...rootsFromChildren(child.props.children));
-        return;
-      }
+        if (child.type === React.Fragment) {
+          structure.push(...rootsFromChildren(child.props.children));
+          return;
+        }
 
-      assert(
-        child.type === Root,
-        `[${
-          typeof child.type === 'string' ? child.type : child.type.name
-        }] is not a <Root> component. All component children of <Column> must be a <Root>  or <React.Fragment>`,
-      );
+        assert(
+          child.type === Root,
+          `[${
+            typeof child.type === 'string' ? child.type : child.type.name
+          }] is not a <Root> component. All component children of <Column> must be a <Root>  or <React.Fragment>`,
+        );
 
-      assert(
-        React.isValidElement(child.props.element),
-        `The element prop of a <Root> must be a valid React Element`,
-      );
+        assert(
+          React.isValidElement(child.props.element),
+          `The element prop of a <Root> must be a valid React Element`,
+        );
 
-      assert(isString(child.props.rootKey), `The rootKey prop of a <Root> must be of type string`);
+        assert(
+          imply(memoize, isString(child.props.rootKey)),
+          `When <Paper> has the memoize prop every <Root> must have a rootKey prop of type string`,
+        );
 
-      structure.push({
-        element: child.props.element,
-        content: child.props.content ?? 'text',
-        rootKey: child.props.rootKey,
+        structure.push({
+          element: child.props.element,
+          rootKey: child.props.rootKey ?? '',
+          content: child.props.content ?? 'text',
+        });
       });
-    });
 
-    return structure;
-  }, []);
+      return structure;
+    },
+    [memoize],
+  );
 
   const structure = React.useMemo(() => {
     const structure: Structure = [];
@@ -67,5 +78,9 @@ export function Paper({ children, pageWidth = 0.6 }: PaperNestedProps): JSX.Elem
     return structure;
   }, [children, rootsFromChildren]);
 
-  return <Paginator structure={structure} pageWidth={pageWidth} />;
+  if (memoize) {
+    return <PaginatorMemo structure={structure} pageWidth={pageWidth} />;
+  }
+
+  return <PaginatorBase structure={structure} pageWidth={pageWidth} />;
 }

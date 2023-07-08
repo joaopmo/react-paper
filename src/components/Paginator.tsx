@@ -183,7 +183,7 @@ export function useSubscribers(): SubContextObject {
   return React.useContext(SubscribersContext);
 }
 
-function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
+export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   const [loading, setLoading] = React.useState(true);
   const [lastChanges, setLastChanges] = React.useState(new Map());
   const columnsMap = useColumnsMap();
@@ -611,7 +611,7 @@ function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   );
 }
 
-export const Paginator = React.memo(PaginatorBase, arePropsEqual);
+export const PaginatorMemo = React.memo(PaginatorBase, arePropsEqual);
 
 function arePropsEqual(oldProps: PaginatorProps, newProps: PaginatorProps) {
   if (oldProps.pageWidth !== newProps.pageWidth) {
