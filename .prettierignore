@@ -4,3 +4,4 @@ dist/
 .eslintrc.cjs
 env.d.ts
 vite.config.ts
+*.cjs

@@ -1,5 +1,4 @@
 import React from 'react';
-import { loremIpsum } from 'lorem-ipsum';
 import { Level, useRegister, Paper, Column, Node, Root } from '../src';
 import '../src/styles/base.css';
 import '../src/styles/print.css';
