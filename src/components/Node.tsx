@@ -1,11 +1,12 @@
+import type React from 'react';
 import { assert } from '../utils';
 
 interface NodeProps {
-  element: JSX.Element;
+  element: React.ReactNode;
   content?: 'block' | 'text';
 }
 
-export function Node(props: NodeProps): JSX.Element {
+export function Node(props: NodeProps): React.ReactNode {
   assert(
     false,
     `A <Node> is only ever to be used as the child of <Level> component, ` +

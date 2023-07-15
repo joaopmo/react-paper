@@ -88,7 +88,7 @@ export function Level({ children, parallel = false }: LevelProps) {
 
   const nodesFromChildren = React.useCallback(
     (children: React.ReactNode, parentIndex: number = 0) => {
-      const nodes: JSX.Element[] = [];
+      const nodes: React.ReactElement[] = [];
 
       React.Children.forEach(children, (child) => {
         if (!React.isValidElement(child)) {
@@ -96,8 +96,7 @@ export function Level({ children, parallel = false }: LevelProps) {
         }
 
         if (child.type === React.Fragment) {
-          nodes.push(...nodesFromChildren(child.props.children, parentIndex + nodes.length));
-          return;
+          return nodes.push(...nodesFromChildren(child.props.children, parentIndex + nodes.length));
         }
 
         assert(

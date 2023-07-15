@@ -1,7 +1,8 @@
 import React from 'react';
-import { Level, useRegister, Paper, Column, Node, Root } from '../src';
-import '../src/styles/base.css';
-import '../src/styles/print.css';
+import { Level, useRegister, Paper, Column, Node, Root } from '@joaopmo/react-paper';
+
+import '@joaopmo/react-paper/css/base';
+import '@joaopmo/react-paper/css/print';
 
 function ComponenteTexto() {
   const { register } = useRegister();

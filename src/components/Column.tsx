@@ -1,10 +1,10 @@
-import React from 'react'; // eslint-disable-line
+import type React from 'react';
 import { assert } from '../utils';
 
 interface ColumnProps {
   children: React.ReactNode;
 }
-export function Column(props: ColumnProps): JSX.Element {
+export function Column(props: ColumnProps): React.ReactNode {
   assert(
     false,
     `A <Column> is only ever to be used as the child of <Paper> component, ` +

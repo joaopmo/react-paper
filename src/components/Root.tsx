@@ -1,12 +1,13 @@
+import type React from 'react';
 import { assert } from '../utils';
 
 interface RootProps {
-  element: JSX.Element;
+  element: React.ReactNode;
   rootKey?: string;
   content?: 'block' | 'text';
 }
 
-export function Root(props: RootProps): JSX.Element {
+export function Root(props: RootProps): React.ReactNode {
   assert(
     false,
     `A <Root> is only ever to be used as the child of <Column> component, ` +

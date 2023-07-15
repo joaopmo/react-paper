@@ -19,6 +19,6 @@
     "declarationMap": true
   },
   "include": ["src", "stories"],
-  "exclude": ["src/App.tsx", "src/main.tsx"],
+  "exclude": [],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

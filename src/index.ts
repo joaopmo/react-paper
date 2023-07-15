@@ -1,1 +1,1 @@
-export { Paper, Column, Node, Level, Root, useRegister } from './components';
+export { Paper, Column, Root, Level, Node, useRegister } from './components';

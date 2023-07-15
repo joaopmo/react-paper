@@ -5,7 +5,7 @@ interface BackdropProps {
   open: boolean;
 }
 
-export function Backdrop({ children, open }: BackdropProps): JSX.Element {
+export function Backdrop({ children, open }: BackdropProps): React.ReactNode {
   return (
     <div className="rp-backdrop" style={{ display: open ? 'flex' : 'none' }}>
       {children}

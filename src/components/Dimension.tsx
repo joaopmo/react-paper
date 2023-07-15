@@ -30,7 +30,7 @@ export function DimensionProvider({
   widthFrac,
   multiplier,
   children,
-}: DimensionProviderProps): JSX.Element {
+}: DimensionProviderProps): React.ReactNode {
   const dimensionRef = React.useRef<HTMLElement | null>(null);
   const [dimensions, setDimensions] = React.useState<DimensionObject>({
     scale: 1,

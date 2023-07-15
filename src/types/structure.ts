@@ -1,6 +1,7 @@
+import type React from 'react';
 export interface StructureRoot {
   content: 'block' | 'text' | 'parallel';
-  element: JSX.Element;
+  element: React.ReactNode;
   rootKey?: string;
 }
 

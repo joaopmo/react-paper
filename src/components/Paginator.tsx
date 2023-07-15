@@ -270,7 +270,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
           const pageHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!, 'contentBox');
           assert(
             currentBox <= pageHeight,
-            'A <Field> of with content prop = block received a element with height greater than the page',
+            'A <Field> of with content prop = block received an element with height greater than the page',
           );
         }
 

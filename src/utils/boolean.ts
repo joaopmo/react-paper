@@ -1,3 +1,3 @@
 export function imply(p: unknown, q: unknown): boolean {
-  return Boolean(p != null || q);
+  return p != null && p !== false ? Boolean(q) : true;
 }

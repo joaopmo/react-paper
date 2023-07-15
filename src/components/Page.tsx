@@ -1,3 +1,4 @@
+/* eslint-disable  @typescript-eslint/no-non-null-assertion */
 import React from 'react';
 import { useDimension } from './Dimension';
 import { LevelProvider } from './Level';
@@ -13,7 +14,7 @@ interface ColumnProps {
   columnIndex: number;
 }
 
-function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX.Element {
+function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): React.ReactNode {
   const { subColumn } = useSubscribers();
 
   const reference = React.useCallback(
@@ -27,23 +28,18 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): JSX
 
   return (
     <div className={`rp-column rp-column-${columnIndex}`} ref={reference}>
-      {column?.map((slice) => {
+      {column?.map((slice, sliceIndex) => {
         const height = slice.lowerBound - slice.upperBound;
         const maxHeight = slice.lowerBound === 0 && slice.upperBound === 0 ? 'none' : height;
         const top = -slice.upperBound;
+        const { content, element, rootKey } = structure[slice.path[0]][slice.path[1]];
+        const key = rootKey !== '' ? rootKey! : `${sliceIndex}.${slice.path.join('.')}`;
 
         return (
-          <div
-            style={{ overflow: 'hidden', maxHeight }}
-            key={structure[slice.path[0]][slice.path[1]].rootKey}
-          >
+          <div style={{ overflow: 'hidden', maxHeight }} key={key}>
             <div style={{ position: 'relative', top }}>
-              <LevelProvider
-                path={slice.path}
-                content={structure[slice.path[0]][slice.path[1]].content}
-                subscribe={slice.current === 0}
-              >
-                {structure[slice.path[0]][slice.path[1]].element}
+              <LevelProvider path={slice.path} content={content} subscribe={slice.current === 0}>
+                {element}
               </LevelProvider>
             </div>
           </div>
@@ -65,7 +61,7 @@ export const Page = React.memo(function Page({
   structure,
   pageIndex,
   loading,
-}: PageProps): JSX.Element {
+}: PageProps): React.ReactNode | null {
   const { scale, ...dimension } = useDimension();
 
   return (
