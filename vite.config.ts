@@ -10,6 +10,9 @@ export default defineConfig({
       jsxRuntime: 'classic',
     }),
   ],
+  resolve: {
+    alias: [{ find: '@', replacement: '/' }],
+  },
   build: {
     lib: {
       // Could also be a dictionary or array of multiple entry points
