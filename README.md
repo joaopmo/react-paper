@@ -1,6 +1,10 @@
-# React Paper
+<p align="center">
+  <img src="https://raw.githubusercontent.com/joaopmo/react-paper/main/.github/assets/logo-green.png" alt="React Paper Logo" />
+</p>
+<p align="center">
+  React Paper is a library for allocating React Components into layouts that simulate paper sheets.
+</p>
 
-React Paper is a library for allocation React Components into layouts that simulate paper sheets. New pages are generated automatically to handle overflowing content.
 
 # Installation
 
