@@ -1,6 +1,5 @@
 import React from 'react';
 import { Level, Node, useRegister } from '@joaopmo/react-paper';
-import { useCounter } from '../CounterLayout';
 
 const style = {
   lineHeight: 1.4,
@@ -8,28 +7,26 @@ const style = {
   fontSize: '30px',
 };
 
+let renderCount = 0;
+
 function SecondLevel() {
   const { register } = useRegister();
+  renderCount++;
 
   return (
     <div {...register()} style={style}>
-      Text
+      {`Render Count: ${renderCount}`}
     </div>
   );
 }
 
 export function CounterComponent() {
   const { register } = useRegister();
-  const { counter } = useCounter();
 
   return (
     <div {...register()}>
       <Level>
-        {Array(counter)
-          .fill(null)
-          .map((_, idx) => {
-            return <Node element={<SecondLevel />} key={idx} />;
-          })}
+        <Node element={<SecondLevel />} />
       </Level>
     </div>
   );

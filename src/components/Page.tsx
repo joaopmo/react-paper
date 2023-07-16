@@ -29,16 +29,18 @@ function Column({ column, structure, pageIndex, columnIndex }: ColumnProps): Rea
   return (
     <div className={`rp-column rp-column-${columnIndex}`} ref={reference}>
       {column?.map((slice, sliceIndex) => {
-        const height = slice.lowerBound - slice.upperBound;
-        const maxHeight = slice.lowerBound === 0 && slice.upperBound === 0 ? 'none' : height;
-        const top = -slice.upperBound;
-        const { content, element, rootKey } = structure[slice.path[0]][slice.path[1]];
-        const key = rootKey !== '' ? rootKey! : `${sliceIndex}.${slice.path.join('.')}`;
+        const { path, current, upperBound, lowerBound } = slice;
+        const { content, element, rootKey } = structure[path[0]][path[1]];
+
+        const top = -upperBound;
+        const key = rootKey !== '' ? rootKey! : `${sliceIndex}.${path.join('.')}`;
+        const marginBottom = lowerBound <= 0 ? lowerBound : 0;
+        const maxHeight = lowerBound <= 0 && upperBound <= 0 ? 'none' : lowerBound - upperBound;
 
         return (
-          <div style={{ overflow: 'hidden', maxHeight }} key={key}>
+          <div style={{ overflow: 'hidden', maxHeight, marginBottom }} key={key}>
             <div style={{ position: 'relative', top }}>
-              <LevelProvider path={slice.path} content={content} subscribe={slice.current === 0}>
+              <LevelProvider path={path} content={content} subscribe={current === 0}>
                 {element}
               </LevelProvider>
             </div>

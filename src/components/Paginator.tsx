@@ -404,6 +404,9 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
         if (state.style.display === 'none') {
           if (state.currPath.length === 2) {
+            if (state.parentStyle.display === 'flex') {
+              state.lowerBound = -state.parentStyle.rowGap;
+            }
             pushPage(state, page, column);
           }
           state.prevPath = [...state.currPath];
