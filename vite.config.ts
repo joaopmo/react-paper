@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import react from '@vitejs/plugin-react';
-import { peerDependencies, devDependencies } from './package.json';
+import { peerDependencies } from './package.json';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -22,7 +22,7 @@ export default defineConfig({
     rollupOptions: {
       // make sure to externalize deps that shouldn't be bundled
       // into your library
-      external: [...Object.keys(peerDependencies), ...Object.keys(devDependencies)],
+      external: [...Object.keys(peerDependencies)],
     },
     target: 'esnext',
     sourcemap: true,
