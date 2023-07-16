@@ -21,6 +21,8 @@ jobs:
         # Dependencies
       - name: Install dependencies
         run: pnpm install
+      - name: Build library
+        run: pnpm build
         #👇 Adds Chromatic as a step in the workflow
       - uses: chromaui/action@v1
         # Options required for Chromatic's GitHub Action
