@@ -37,7 +37,7 @@ export function useRegister() {
 interface LevelProviderProps {
   path: Path;
   children: React.ReactNode;
-  content: 'block' | 'text' | 'parallel' | null;
+  content: 'block' | 'text' | 'parallel' | 'header';
   subscribe: boolean;
 }
 

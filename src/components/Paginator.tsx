@@ -19,12 +19,12 @@ const ROOT = 1;
 export interface Node {
   path: Path;
   children: number;
-  content: 'block' | 'text' | 'parallel' | null;
+  content: 'block' | 'text' | 'parallel' | 'header';
   element: Element;
   prevSize: number;
 }
 
-function useNodesMap() {
+function useNodeMap() {
   const pathToNode = React.useRef<Map<string, Node>>(new Map());
   const pathToChildren = React.useRef<Map<string, number>>(new Map());
 
@@ -102,8 +102,6 @@ function useNodesMap() {
               return node;
             }
           }
-
-          return undefined;
         }
       },
       childCount(path: Path) {
@@ -121,18 +119,29 @@ function useNodesMap() {
   }, []);
 }
 
-function useColumnsMap() {
-  const columnsMap = React.useRef<Map<number, Element>>(new Map());
+function useColumnMap() {
+  const columnMap = React.useRef<Map<number, Element>>(new Map());
   return React.useMemo(() => {
     return {
       set(idx: number, ref: Element) {
-        columnsMap.current.set(idx, ref);
+        columnMap.current.set(idx, ref);
       },
       get(idx: number) {
-        return columnsMap.current.get(idx);
+        return columnMap.current.get(idx);
       },
-      delete(idx: number) {
-        return columnsMap.current.delete(idx);
+    };
+  }, []);
+}
+
+function usePageMap() {
+  const page = React.useRef<Element>();
+  return React.useMemo(() => {
+    return {
+      set(ref: Element) {
+        page.current = ref;
+      },
+      get() {
+        return page.current;
       },
     };
   }, []);
@@ -163,31 +172,41 @@ export interface State {
 }
 
 export interface SubContextObject {
+  subPage: ((el: Element) => void) | null;
   subNode: ((node: Node) => (() => void) | undefined) | null;
   subColumn: ((el: Element, columnIndex: number) => void) | null;
 }
 
-interface Action {
-  type: string;
-  payload: {
-    changes?: Map<number, Path>;
-  };
-}
-
-export const SubscribersContext = React.createContext<SubContextObject>({
+export const SubscriberContext = React.createContext<SubContextObject>({
+  subPage: null,
   subNode: null,
   subColumn: null,
 });
 
 export function useSubscribers(): SubContextObject {
-  return React.useContext(SubscribersContext);
+  return React.useContext(SubscriberContext);
 }
+
+interface ResizeAction {
+  type: 'resize';
+  payload: {
+    changes: Map<number, Path>;
+  };
+}
+
+interface ResetAction {
+  type: 'reset';
+  payload: Record<string, unknown>;
+}
+
+type Action = ResizeAction | ResetAction;
 
 export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   const [loading, setLoading] = React.useState(true);
   const [lastChanges, setLastChanges] = React.useState(new Map());
-  const columnsMap = useColumnsMap();
-  const nodesMap = useNodesMap();
+  const pageMap = usePageMap();
+  const nodeMap = useNodeMap();
+  const columnMap = useColumnMap();
   const prevStructureShape = React.useRef<null | number[]>(null);
 
   function init(schema: Schema): Schema {
@@ -209,10 +228,9 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   }
 
   function reducer(prevSchema: Schema, { type, payload }: Action) {
-    const { changes } = payload;
     switch (type) {
       case 'resize':
-        return calcPosition(prevSchema, changes);
+        return calcPosition(prevSchema, payload.changes);
       case 'reset':
         return init([]);
       default:
@@ -234,6 +252,25 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       lowerBound: state.lowerBound,
     });
   }, []);
+
+  const columnHeight = React.useCallback(
+    (column: SchemaColumn, path: Path) => {
+      const firstColumn = columnMap.get(0)!;
+
+      if (
+        path[COLUMN] !== 0 &&
+        column.length === 0 &&
+        firstColumn.classList.contains('rp-header')
+      ) {
+        const headerHeight = getStyle(firstColumn, 'marginBox');
+        const columnHeight = getStyle(columnMap.get(path[COLUMN])!, 'contentBox');
+        return columnHeight - headerHeight;
+      }
+
+      return getStyle(columnMap.get(path[COLUMN])!, 'contentBox');
+    },
+    [columnMap],
+  );
 
   const boxOverflow = React.useCallback(
     (state: State, page: SchemaPage, column: SchemaColumn, box: keyof PartialStyle<number>) => {
@@ -266,11 +303,19 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
           break;
         }
 
-        if (box === 'borderBox') {
-          const pageHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!, 'contentBox');
+        if (['block', 'parallel'].includes(state.field.content)) {
+          const pageHeight = columnHeight(column, state.currPath);
           assert(
-            currentBox <= pageHeight,
-            'A <Field> of with content prop = block received an element with height greater than the page',
+            pageHeight >= currentBox,
+            'A <Node> with content prop = block received an element with height greater than the column',
+          );
+        }
+
+        if (state.field.content === 'header') {
+          const pageHeight = getStyle(pageMap.get()!, 'contentBox');
+          assert(
+            pageHeight >= currentBox,
+            'The <Header> received an element with height greater than the column',
           );
         }
 
@@ -290,10 +335,10 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
         page.length = 0;
         state.addedHeight = 0;
         state.upperBound = state.lowerBound;
-        state.freeHeight = getStyle(columnsMap.get(state.currPath[COLUMN])!, 'contentBox');
+        state.freeHeight = columnHeight(column, state.currPath);
       }
     },
-    [columnsMap, pushPage],
+    [columnHeight, pageMap, pushPage],
   );
 
   const findPrevVisibleSib = React.useCallback(
@@ -301,7 +346,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       const parentPath = path.slice(0, -1);
 
       for (let i = path.at(-1)! - 1; i >= 0; i--) {
-        const sibling = nodesMap.get([...parentPath, i])!;
+        const sibling = nodeMap.get([...parentPath, i])!;
         const siblingDisplay = getStyle(sibling.element, 'display');
         if (siblingDisplay !== 'none') {
           return sibling.element;
@@ -310,16 +355,16 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
       return undefined;
     },
-    [nodesMap],
+    [nodeMap],
   );
 
   const findNextVisibleSib = React.useCallback(
     (path: Path) => {
       const parentPath = path.slice(0, -1);
-      const siblingsCount = nodesMap.childCount(parentPath)!;
+      const siblingsCount = nodeMap.childCount(parentPath)!;
 
       for (let i = path.at(-1)! + 1; i < siblingsCount; i++) {
-        const sibling = nodesMap.get([...parentPath, i])!;
+        const sibling = nodeMap.get([...parentPath, i])!;
         const siblingDisplay = getStyle(sibling.element, 'display');
         if (siblingDisplay !== 'none') {
           return sibling.element;
@@ -328,17 +373,17 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
       return undefined;
     },
-    [nodesMap],
+    [nodeMap],
   );
 
   const maxSizeParallelSibPath = React.useCallback(
     (path: Path): Path => {
-      const parentField = nodesMap.get(path) as Node;
+      const parentField = nodeMap.get(path) as Node;
       let maxSize = 0;
       let maxIndex = 0;
 
       for (let i = 0; i < parentField.children; i++) {
-        const currField = nodesMap.get([...path, i]) as Node;
+        const currField = nodeMap.get([...path, i]) as Node;
         const currSize = getStyle(currField.element, 'marginBox');
         if (currSize > maxSize) {
           maxSize = currSize;
@@ -348,7 +393,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
       return [...path, maxIndex];
     },
-    [nodesMap],
+    [nodeMap],
   );
 
   const allocate = React.useCallback(
@@ -356,11 +401,11 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       const page: SchemaPage = [];
       const column: SchemaColumn = [];
 
-      const freeHeight = getStyle(columnsMap.get(path[COLUMN])!, 'contentBox');
-      const field = nodesMap.get(path) as Node;
+      const freeHeight = columnHeight(column, path);
+      const field = nodeMap.get(path) as Node;
       const columnStyle: State['parentStyle'] = {
-        rowGap: getStyle(columnsMap.get(path[COLUMN])!, 'rowGap'),
-        display: getStyle(columnsMap.get(path[COLUMN])!, 'display'),
+        rowGap: getStyle(columnMap.get(path[COLUMN])!, 'rowGap'),
+        display: getStyle(columnMap.get(path[COLUMN])!, 'display'),
       };
 
       const state: State = {
@@ -384,7 +429,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
       while (pathStack.length > 0) {
         state.currPath = pathStack.pop()!;
-        state.field = nodesMap.get(state.currPath) as Node;
+        state.field = nodeMap.get(state.currPath) as Node;
         state.style = getStyle(state.field.element);
 
         const prevRoot = state.prevPath[ROOT];
@@ -416,7 +461,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
         const parentPath = state.currPath.slice(0, -1);
         // If currPath is a root node, then the parent is the column
         if (parentPath.length === 1) state.parentStyle = columnStyle;
-        else state.parentStyle = getStyle((nodesMap.get(parentPath) as Node).element);
+        else state.parentStyle = getStyle((nodeMap.get(parentPath) as Node).element);
         state.prevSibEl = findPrevVisibleSib(state.currPath);
         state.nextSibEl = findNextVisibleSib(state.currPath);
 
@@ -427,7 +472,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
           if (state.field.children !== 0) {
             pathStack.push([...state.currPath]);
-            const firstChildField = nodesMap.get([...state.currPath, 0]) as Node;
+            const firstChildField = nodeMap.get([...state.currPath, 0]) as Node;
 
             if (firstChildField.content === 'parallel') {
               pathStack.push(maxSizeParallelSibPath(state.currPath));
@@ -449,7 +494,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
           boxOverflow(state, page, column, 'borderBottom');
         }
 
-        if (state.field.content === 'block' || state.field.content === 'parallel') {
+        if (['block', 'parallel', 'header'].includes(state.field.content)) {
           boxOverflow(state, page, column, 'marginTop');
           boxOverflow(state, page, column, 'borderBox');
         }
@@ -474,8 +519,9 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
       return column;
     },
     [
-      columnsMap,
-      nodesMap,
+      columnHeight,
+      nodeMap,
+      columnMap,
       structure,
       findPrevVisibleSib,
       findNextVisibleSib,
@@ -486,12 +532,15 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   );
 
   const calcPosition = React.useCallback(
-    function (oldSchema: Schema, changes?: Map<number, Path>) {
+    function (oldSchema: Schema, changes: Map<number, Path>) {
       const schema = structuredClone(oldSchema);
-      if (changes == null) {
-        changes = new Map();
+
+      const firstColumn = changes.get(0);
+      const isHeader = firstColumn == null ? false : nodeMap.get(firstColumn)!.content === 'header';
+
+      if (changes.size === 0 || isHeader) {
         structure.forEach((column, columnIndex) => {
-          if (column.length > 0 && changes instanceof Map) {
+          if (column.length > 0) {
             changes.set(columnIndex, [columnIndex, 0]);
           }
         });
@@ -503,7 +552,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
       return schema;
     },
-    [structure, allocate],
+    [nodeMap, structure, allocate],
   );
 
   const [schema, dispatch] = React.useReducer(reducer, [], init);
@@ -511,9 +560,9 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
   const resizeHandler = React.useCallback(
     (entries: ResizeObserverEntry[]) => {
       const changes = entries.reduce((acc, { target: el }) => {
-        if (!nodesMap.sizeDiff(el)) return acc;
-        if (!nodesMap.hasParents(el)) return acc;
-        const path = (nodesMap.get(el) as Node).path;
+        if (!nodeMap.sizeDiff(el)) return acc;
+        if (!nodeMap.hasParents(el)) return acc;
+        const path = (nodeMap.get(el) as Node).path;
         acc.set(path[COLUMN], [path[COLUMN], 0]);
         return acc;
       }, new Map<number, Path>());
@@ -522,7 +571,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
         setLastChanges(changes);
       }
     },
-    [nodesMap],
+    [nodeMap],
   );
 
   const observer = React.useMemo(() => {
@@ -539,29 +588,36 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
   const subNode = React.useCallback(
     (node: Node) => {
-      const prevNode = nodesMap.get(node.element);
+      const prevNode = nodeMap.get(node.element);
       if (
         prevNode == null ||
         prevNode.prevSize !== node.prevSize ||
         prevNode.path.join('.') !== node.path.join('.')
       ) {
-        nodesMap.set(node);
+        nodeMap.set(node);
         observer.observe(node);
 
         return function unsubscribe() {
-          nodesMap.delete(node);
+          nodeMap.delete(node);
           observer.unobserve(node);
         };
       }
     },
-    [nodesMap, observer],
+    [nodeMap, observer],
+  );
+
+  const subPage = React.useCallback(
+    (ref: Element) => {
+      pageMap.set(ref);
+    },
+    [pageMap],
   );
 
   const subColumn = React.useCallback(
     (ref: Element, columnIndex: number) => {
-      columnsMap.set(columnIndex, ref);
+      columnMap.set(columnIndex, ref);
     },
-    [columnsMap],
+    [columnMap],
   );
 
   React.useMemo(() => {
@@ -576,7 +632,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
   React.useEffect(() => {
     prevStructureShape.current = structure.map((column) => column.length);
-    dispatch({ type: 'resize', payload: {} });
+    dispatch({ type: 'resize', payload: { changes: new Map() } });
   }, [structure]);
 
   React.useEffect(() => {
@@ -593,8 +649,10 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
   const zipped = React.useMemo(() => zip(schema), [schema]);
 
+  console.log('Render');
+
   return (
-    <SubscribersContext.Provider value={{ subNode, subColumn }}>
+    <SubscriberContext.Provider value={{ subNode, subPage, subColumn }}>
       <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
         <div className="rp-container">
           {zipped.map((columns: Array<SchemaPage | null>, index) => {
@@ -610,7 +668,7 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
           })}
         </div>
       </DimensionProvider>
-    </SubscribersContext.Provider>
+    </SubscriberContext.Provider>
   );
 }
 

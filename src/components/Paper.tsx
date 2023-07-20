@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { assert, imply } from '../utils';
 import { Column } from './Column';
 import { Root } from './Root';
+import { Header } from './Header';
 import { type Structure, type StructureColumn } from '../types';
 import { PaginatorBase, PaginatorMemo } from './Paginator';
 interface PaperProps {
@@ -18,6 +19,29 @@ export function Paper({ children, pageWidth = 0.6, memoize = false }: PaperProps
   assert(
     pageWidth >= 0.1 && pageWidth <= 1,
     `The pageWidth prop should be a number between 0.1 and 1.`,
+  );
+
+  const extractHeader = React.useCallback(
+    (header: React.ReactElement): StructureColumn => {
+      assert(
+        React.isValidElement(header.props.element),
+        `The element prop of a <Header> must be a valid React Element`,
+      );
+
+      assert(
+        imply(memoize, isString(header.props.rootKey)),
+        `When <Paper> has a memoize prop the <Header> must have a rootKey prop of type string`,
+      );
+
+      return [
+        {
+          content: 'header',
+          element: header.props.element,
+          rootKey: header.props.rootKey ?? '',
+        },
+      ];
+    },
+    [memoize],
   );
 
   const rootsFromChildren = React.useCallback(
@@ -63,27 +87,41 @@ export function Paper({ children, pageWidth = 0.6, memoize = false }: PaperProps
   );
 
   const columnsFromChildren = useCallback(
-    (children: React.ReactNode): Structure => {
+    (children: React.ReactNode, parentIndex: number = 0): Structure => {
       const structure: Structure = [];
 
-      React.Children.forEach(children, (column, columnIndex) => {
+      React.Children.forEach(children, (child) => {
+        const currentColumn = parentIndex + structure.length;
+
         assert(
-          React.isValidElement(column),
-          `Children [${columnIndex}] is an invalid React Element. Expected a <Column> Element`,
+          React.isValidElement(child),
+          `Children [${currentColumn}] is an invalid React Element. Expected a <Column> or <React.Fragment>`,
         );
 
-        if (column.type === React.Fragment) {
-          return structure.push(...columnsFromChildren(column.props.children));
+        if (child.type === React.Fragment) {
+          return structure.push(...columnsFromChildren(child.props.children, currentColumn));
         }
 
-        assert(column.type === Column, `Children [${columnIndex}] is not a <Column>`);
+        assert(
+          imply(currentColumn === 0, child.type === Header || child.type === Column),
+          `The first children of <Paper> should be a <Header> or <Column>`,
+        );
 
-        structure.push(rootsFromChildren(column.props.children));
+        assert(
+          imply(currentColumn !== 0, child.type === Column),
+          `Children [${currentColumn}] of <Paper> is not a <Column>`,
+        );
+
+        if (child.type === Header) {
+          structure.push(extractHeader(child));
+        } else {
+          structure.push(rootsFromChildren(child.props.children));
+        }
       });
 
       return structure;
     },
-    [rootsFromChildren],
+    [extractHeader, rootsFromChildren],
   );
 
   const structure = React.useMemo(() => {

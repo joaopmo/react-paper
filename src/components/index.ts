@@ -3,3 +3,4 @@ export * from './Level';
 export * from './Node';
 export * from './Paper';
 export * from './Root';
+export * from './Header';

@@ -16,7 +16,7 @@
 
 .rp-page {
     display: flex;
-    justify-content: space-around;
+    flex-wrap: wrap;
     background-color: white;
     box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.15);
     transform-origin: top left;
@@ -26,9 +26,16 @@
     overflow: hidden;
 }
 
-.rp-column {
-    flex: 1;
+.rp-header {
+    flex: 1 1 100%;
 }
+
+.rp-column {
+    height: 100%;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
 
 .rp-column img {
     display: block;
