@@ -649,8 +649,6 @@ export function PaginatorBase({ structure, pageWidth }: PaginatorProps) {
 
   const zipped = React.useMemo(() => zip(schema), [schema]);
 
-  console.log('Render');
-
   return (
     <SubscriberContext.Provider value={{ subNode, subPage, subColumn }}>
       <DimensionProvider widthFrac={pageWidth} multiplier={3.78}>
