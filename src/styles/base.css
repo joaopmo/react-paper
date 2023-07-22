@@ -22,7 +22,7 @@
     transform-origin: top left;
 }
 
-.rp-page, .rp-page * {
+.rp-page, .rp-page > * {
     overflow: hidden;
 }
 
