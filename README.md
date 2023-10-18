@@ -34,7 +34,7 @@ React Paper was developed for a resume-builder kind of web app, where it was gen
 
 # Quick Start
 
-Your app will use at least the `<Paper />`, `<Column />` and `<Root />` components, as well as the `useRegister()` hook and the `css/base` stylesheet. 
+In general, your app will use at least the `<Paper />`, `<Column />` and `<Root />` components, as well as the `useRegister()` hook and the `css/base` stylesheet.
 
 All the components related to the React Paper library must be wrapped within a `<Paper />` component to ensure they work as expected. The `<Paper />` component can have one or more `<Column />` components as children. Each `<Column />` can have one or more `<Root />` components as children.
 
@@ -54,12 +54,12 @@ import '@joaopmo/react-paper/css/base';
 
 export function App() {
   return (
-    <Paper>
-      <Column>
-        <Root element={<ImageComponent />} />
-        <Root element={<ImageComponent />} content='block' />
-      </Column>
-    </Paper>
+          <Paper>
+            <Column>
+              <Root element={<ImageComponent />} />
+              <Root element={<ImageComponent />} content='block' />
+            </Column>
+          </Paper>
   );
 }
 ```
@@ -74,8 +74,8 @@ import React from 'react';
 import { useRegister } from '@joaopmo/react-paper';
 
 const style = {
-    lineHeight: 1.4,
-    margin: '5px'
+  lineHeight: 1.4,
+  margin: '5px'
 };
 
 const text =  `
@@ -84,9 +84,9 @@ const text =  `
 
 export function TextComponent() {
   const { register } = useRegister();
-  
+
   return (
-      <div {...register()} style={style}>{text}</div>
+          <div {...register()} style={style}>{text}</div>
   );
 }
 ```
@@ -97,19 +97,19 @@ import React from 'react';
 import { useRegister } from '@joaopmo/react-paper';
 
 export function ImageComponent() {
-    const { register } = useRegister();
-    
-    return (
-        <div {...register()}>
+  const { register } = useRegister();
+
+  return (
+          <div {...register()}>
             <img src='' />
-        </div>
-    );
+          </div>
+  );
 }
 ```
 
 ## Complex Layouts
 
-The rules for registering nodes make it hard to create complex layouts. For that, you can use the `<Level />` and `<Node />` components. The `<Level />` component is used to wrap one or more `<Node />` components. The `<Node />` component is similar to the `<Root />` component, but it can be nested to create more complex layouts. 
+The rules for registering nodes make it hard to create complex layouts. For that, you can use the `<Level />` and `<Node />` components. The `<Level />` component is used to wrap one or more `<Node />` components. The `<Node />` component is similar to the `<Root />` component, but it can be nested to create more complex layouts.
 
 The next example shows a slightly more complex layout:
 
@@ -124,11 +124,11 @@ import '@joaopmo/react-paper/css/base';
 
 export function App() {
   return (
-    <Paper>
-      <Column>
-        <Root element={<BaseComponent />} />
-      </Column>
-    </Paper>
+          <Paper>
+            <Column>
+              <Root element={<BaseComponent />} />
+            </Column>
+          </Paper>
   );
 }
 ```
@@ -141,22 +141,22 @@ import React from 'react';
 import { useRegister } from '@joaopmo/react-paper';
 
 const style = {
-    display: 'flex',
-    flexDirection: 'column',
-    rowGap: '10px'
+  display: 'flex',
+  flexDirection: 'column',
+  rowGap: '10px'
 };
 
 export function BaseComponent() {
   const { register } = useRegister();
-  
+
   return (
-      <div {...register()} style={style}>
-          <Level>
+          <div {...register()} style={style}>
+            <Level>
               <Node element={<Heading />}/>
               <Node element={<Text />}/>
               <Node element={<Image />} content='block' />
-          </Level>
-      </div>
+            </Level>
+          </div>
   );
 }
 ```
@@ -167,6 +167,7 @@ In addition to applying `margin`, you can also create space between sibling node
 
 # API Documentation
 - [\<Paper />](#paper)
+- [\<Header />](#header)
 - [\<Column />](#column)
 - [\<Root />](#root)
 - [\<Level />](#level)
@@ -175,21 +176,39 @@ In addition to applying `margin`, you can also create space between sibling node
 - [Styles](#styles)
 
 ## Paper
-The part of your application that uses React-Paper functionality must be nested within a parent `<Paper />` component. 
+The part of your application that uses React-Paper functionality must be nested within a parent `<Paper />` component.
 
 ### Props
 
 ```ts
 interface PaperProps {
-    children: React.ReactNode;
-    pageWidth?: number;
-    memoize?: boolean;
+  children: React.ReactNode;
+  pageWidth?: number;
+  memoize?: boolean;
 }
 ```
 
 - `children`: Accepts `<Column />` components and inserts a new column in each page for every one received.
 - `pageWidth`: A number between `0.1` and `1` indicating the percentage of available width that should be taken by the pages. Defaults to `0.6`.
 - `memoize`: A boolean indicating if the library should use memoization. If `true` the `rootKey` prop will be required in every `<Root />` component. Defaults to `false`.
+
+## Header
+
+Can be used to create a Header with a different column count than the remainder of the document.
+
+It should be used as a direct children of `<Paper>`. The content inside a `<Header>` is required to be of type `block`, the same as a `<Root>` or `<Node>` components with `content='block'`.
+
+### Props
+
+```ts
+interface HeaderProps {
+    element: React.ReactNode;
+    rootKey?: string;
+}
+```
+
+- `element`: The React Element to render in the position of the given `<Header />` component.
+- `rootKey`: Exclusive id of the given `<Header />` component (must be different from the `<Root>` components). Required only if memoization is being used.
 
 ## Column
 
@@ -217,15 +236,15 @@ Due to the duplication, it may be better for performance to have smaller element
 
 ```ts
 interface RootProps {
-    element: React.ReactNode;
-    rootKey?: string;
-    content?: 'block' | 'text';
+  element: React.ReactNode;
+  rootKey?: string;
+  content?: 'block' | 'text';
 }
 ```
 
 - `element`: The React Element to render in the position of the given `<Root />` component.
 - `content`: Type of the content rendered by the React Element passed to the given `<Root />` component. Defaults to `'text'`.
-    - **'text'**: Content of type 'text' means it can suffer page breaks (i.e. be split into multiple pages if necessary). It requires both the registered HTML element and the content to be given a matching `line-height` CSS property.
+  - **'text'**: Content of type 'text' means it can suffer page breaks (i.e. be split into multiple pages if necessary). It requires both the registered HTML element and the content to be given a matching `line-height` CSS property.
   - **'block'**: Content of type 'block' means it cannot suffer page breaks (i.e. it must be allocated into a single page). Consequently, the rendered content must have a `height` smaller than the available space on the page.
 - `rootKey`: Exclusive id of the given `<Root />` component. Required only if memoization is being used.
 
@@ -236,8 +255,8 @@ Used to group `<Node />` components.
 
 ```ts
 interface LevelProps {
-    children: React.ReactNode;
-    parallel?: boolean;
+  children: React.ReactNode;
+  parallel?: boolean;
 }
 ```
 
@@ -252,8 +271,8 @@ It can be used recursively in combination with `<Level />` components to create 
 
 ```ts
 interface NodeProps {
-    element: React.ReactNode;
-    content?: 'block' | 'text';
+  element: React.ReactNode;
+  content?: 'block' | 'text';
 }
 ```
 
@@ -272,13 +291,13 @@ const useRegisterResult = useRegister();
 ```ts
 // Signature
 interface useRegisterResult {
-    register: (display?: boolean) => Register;
+  register: (display?: boolean) => Register;
 }
 
 interface Register {
-    ref: React.MutableRefObject<null> | null;
-    'data-rp-id': string;
-    'data-rp-display': string;
+  ref: React.MutableRefObject<null> | null;
+  'data-rp-id': string;
+  'data-rp-display': string;
 }
 ```
 - `register`: A function that defines how the element to be registered will be rendered based on the provided argument. It returns an object with the React Reference to register the element and HTML data-attributes used internally by the library.
@@ -288,6 +307,6 @@ interface Register {
     - ref: React ref
     - data-rp-id: HTML data attribute used to give the element an id used internally.
     - data-rp-display: HTML data attribute used to hide the element based on the `display` argument.
-  
+
 
 ## Styles
