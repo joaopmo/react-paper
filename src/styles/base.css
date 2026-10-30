@@ -1,77 +1,72 @@
 .rp-dimension {
-    display: flex;
-    justify-content: center;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  width: 100%;
 }
 
 .rp-container,
-.rp-container * {
-    box-sizing: border-box;
+.rp-container *,
+.rp-staging,
+.rp-staging * {
+  box-sizing: border-box;
 }
 
 .rp-container {
-    display: flex;
-    flex-direction: column;
-    row-gap: 10px;
+  display: flex;
+  flex-direction: column;
+  row-gap: 16px;
 }
 
 .rp-page {
-    display: flex;
-    flex-wrap: wrap;
-    background-color: white;
-    box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.15);
-    transform-origin: top left;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.08);
+  transform-origin: top left;
+  position: relative;
+  overflow: hidden;
 }
 
-.rp-page, .rp-page > * {
-    overflow: hidden;
+.rp-page-underlay,
+.rp-page-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
-.rp-header {
-    flex: 1 1 100%;
+.rp-page-underlay {
+  z-index: 0;
+}
+
+.rp-page-overlay {
+  z-index: 2;
+}
+
+.rp-header,
+.rp-columns,
+.rp-footer {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+.rp-columns {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
 }
 
 .rp-column {
-    height: 100%;
-    flex-grow: 1;
-    flex-shrink: 1;
+  height: 100%;
+  overflow: hidden;
 }
-
 
 .rp-column img {
-    display: block;
-    margin: 0;
+  display: block;
+  max-width: 100%;
 }
 
-.rp-column [data-rp-display="none"] {
-    display: none;
-}
-
-.rp-backdrop {
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    position: absolute;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: rgba(0, 0, 0, 0.7);
-}
-
-.rp-spinner {
-    width: 4rem;
-    height: 4rem;
-    border: 10px solid #f3f3f3;
-    border-top: 10px solid #3498db;
-    border-radius: 50%;
-    animation: spin 0.5s cubic-bezier(0.35, 0.65, 0.35, 0.65) infinite;
-}
-
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
+[data-rp-display="none"] {
+  display: none !important;
 }

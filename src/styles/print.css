@@ -1,45 +1,62 @@
 @page {
-    size: A4 portrait;
-    margin: 0;
-    padding: 0;
+  margin: 0;
+  padding: 0;
 }
 
 @media print {
-    html,
-    body,
-    body * {
-        visibility: hidden;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
-    }
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 
-    .rp-container, .rp-container * {
-        visibility: visible;
-    }
+  body * {
+    visibility: hidden;
+  }
 
-    .rp-container {
-        display: block !important;
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        outline: none !important;
-    }
+  .rp-dimension {
+    display: block !important;
+    position: static !important;
+  }
 
-    .rp-backdrop {
-        display: none;
-    }
+  .rp-staging {
+    display: none !important;
+  }
 
-    .rp-page {
-        break-inside: avoid !important;
-        page-break-after: always !important;
-        box-shadow: none !important;
-        transform: scale(1) !important;
-        height: 297mm !important;
-        width: 210mm !important;
-    }
+  .rp-container,
+  .rp-container * {
+    visibility: visible;
+  }
+
+  .rp-container {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    row-gap: 0 !important;
+    border: none !important;
+    outline: none !important;
+  }
+
+  .rp-page {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    box-shadow: none !important;
+    transform: none !important;
+    margin: 0 !important;
+    width: var(--rp-page-css-width, 210mm) !important;
+    height: var(--rp-page-css-height, 297mm) !important;
+  }
+
+  .rp-page:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
 }

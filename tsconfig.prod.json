@@ -1,4 +1,16 @@
 {
   "extends": "./tsconfig",
-  "exclude": ["stories", "src/main.tsx", "src/App.tsx"]
+  "compilerOptions": {
+    "rootDir": "src",
+    "paths": {}
+  },
+  "include": ["src"],
+  "exclude": [
+    "stories",
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
 }

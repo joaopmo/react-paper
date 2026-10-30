@@ -4,7 +4,7 @@ import { useRegister } from '@joaopmo/react-paper';
 import { loremIpsum } from 'lorem-ipsum';
 import { random } from '../../utils';
 
-const style = {
+const style: React.CSSProperties = {
   fontSize: '50px',
   textAlign: 'center',
   lineHeight: 1.4,

@@ -4,7 +4,7 @@
     "useDefineForClassFields": true,
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "module": "ESNext",
-    "skipLibCheck": false,
+    "skipLibCheck": true,
     "allowJs": false,
 
     /* Bundler mode */
@@ -23,7 +23,12 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "dist",
     "declaration": true,
-    "declarationMap": true
+    "declarationMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@joaopmo/react-paper": ["./src/index.ts"],
+      "@joaopmo/react-paper/core": ["./src/core/index.ts"]
+    }
   },
   "include": ["src", "stories"],
   "exclude": [],
