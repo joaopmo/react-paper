@@ -49,6 +49,12 @@
   position: relative;
   z-index: 1;
   width: 100%;
+  flex-shrink: 0;
+}
+
+.rp-header,
+.rp-footer {
+  display: flow-root;
 }
 
 .rp-columns {
@@ -65,6 +71,12 @@
 .rp-column img {
   display: block;
   max-width: 100%;
+}
+
+.rp-legacy-slice-inner > [data-rp-node],
+.rp-legacy-slice-inner [data-rp-node] {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 [data-rp-display="none"] {

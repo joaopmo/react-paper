@@ -175,6 +175,23 @@ function computeEffectiveTopSpacing(
   return { gapBefore, effMarginTop };
 }
 
+function buildWholeSubtreeSlices(nodes: PreparedNode[] | undefined): FragmentSlice[] | undefined {
+  if (nodes == null || nodes.length === 0) return undefined;
+  return nodes.map((child) => ({
+    nodeId: child.id,
+    kind: child.kind,
+    fragmentPosition: 'single',
+    fragmentIndex: 0,
+    fragmentCount: 1,
+    allocatedHeight: child.marginTop + child.height + child.marginBottom,
+    marginTop: child.marginTop,
+    marginBottom: child.marginBottom,
+    chromeTop: child.chromeTop,
+    chromeBottom: child.chromeBottom,
+    children: buildWholeSubtreeSlices(child.children),
+  }));
+}
+
 /**
  * Allocates a list of sibling nodes into `targetPages` (indexed by `state.pageIndex`),
  * updating `state.pageIndex` and `state.usedHeight`.
@@ -187,6 +204,7 @@ function allocateNodeList(
   geometry: PageGeometry,
   emitSlice: (pageIndex: number, slice: FragmentSlice) => void,
   getReservedBottomOnCurrentPage: () => number,
+  parentAdvance: () => void,
   onBeforePageAdvance?: () => void,
   onAfterPageAdvance?: () => void,
 ): void {
@@ -195,7 +213,7 @@ function allocateNodeList(
 
   const advance = () => {
     onBeforePageAdvance?.();
-    advancePage(state);
+    parentAdvance();
     onAfterPageAdvance?.();
     hasPrevOnPage = false;
     prevMarginBottomOnPage = 0;
@@ -330,6 +348,7 @@ function allocateSingleNode(
       marginBottom: node.marginBottom,
       chromeTop: node.chromeTop,
       chromeBottom: node.chromeBottom,
+      children: buildWholeSubtreeSlices(node.children),
     });
     return;
   }
@@ -622,6 +641,7 @@ function allocateSingleNode(
       () =>
         getReservedBottomOnCurrentPage() +
         (breakRules.boxDecorationBreak === 'clone' ? node.chromeBottom : 0),
+      advance,
       () => closeContainerOnCurrentPage(false),
       () => openContinuationOnNewPage(),
     );
@@ -819,6 +839,7 @@ export function paginateTree(
         state.pages[pageIdx].push(slice);
       },
       () => 0,
+      () => advancePage(state),
     );
 
     // Trim trailing empty pages if > 1

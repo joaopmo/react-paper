@@ -44,7 +44,10 @@ export interface BlockProps extends Omit<React.HTMLAttributes<HTMLElement>, 'chi
 }
 
 export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
-  {
+  rawProps,
+  forwardedRef,
+) {
+  const {
     as: Component = 'div',
     id,
     kind,
@@ -61,31 +64,29 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
     style,
     children,
     ...rest
-  },
-  forwardedRef,
-) {
+  } = rawProps;
+
   const parentPath = React.useContext(BlockPathContext);
   const { isMeasurementPass, sliceMap } = React.useContext(PageSliceContext);
+  const tokenRef = React.useRef<object>(rawProps);
 
-  const assignedIndexRef = React.useRef<{ passId: number; index: number } | null>(null);
+  let myIndex = 0;
   if (parentPath != null) {
-    if (
-      assignedIndexRef.current == null ||
-      assignedIndexRef.current.passId !== parentPath.passId
-    ) {
-      assignedIndexRef.current = {
-        passId: parentPath.passId,
-        index: parentPath.childCounter.nextIndex++,
-      };
+    const existing = parentPath.childCounter.byToken.get(tokenRef.current);
+    if (existing != null) {
+      myIndex = existing;
+    } else {
+      myIndex = parentPath.childCounter.nextIndex++;
+      parentPath.childCounter.byToken.set(tokenRef.current, myIndex);
     }
   }
 
-  const myIndex = assignedIndexRef.current?.index ?? 0;
   const nodeId = id ?? (parentPath != null ? `${parentPath.parentId}.${myIndex}` : `0.${myIndex}`);
 
-  const ownPassIdRef = React.useRef(0);
-  ownPassIdRef.current += 1;
-  const childCounter = { nextIndex: 0 };
+  const childCounter = {
+    nextIndex: 0,
+    byToken: new WeakMap<object, number>(),
+  };
 
   const slice = !isMeasurementPass && sliceMap != null ? sliceMap.get(nodeId) : undefined;
 
@@ -116,6 +117,15 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
   const computedStyle: React.CSSProperties = { ...style };
   if (!display) {
     computedStyle.display = 'none';
+  }
+
+  if (!isMeasurementPass && slice != null) {
+    if (slice.marginTop === 0) {
+      computedStyle.marginTop = 0;
+    }
+    if (slice.marginBottom === 0) {
+      computedStyle.marginBottom = 0;
+    }
   }
 
   if (!isMeasurementPass && fragmentValue.isSplit) {
@@ -156,77 +166,99 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
     slice.lineRange != null &&
     fragmentValue.isSplit;
 
+  const innerBody = (
+    <>
+      {isMeasurementPass && renderedContinuationHeader != null && (
+        <div
+          data-rp-continuation-header=""
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            visibility: 'hidden',
+            pointerEvents: 'none',
+            left: 0,
+            right: 0,
+          }}
+        >
+          {renderedContinuationHeader}
+        </div>
+      )}
+      {!isMeasurementPass && fragmentValue.isContinuation && renderedContinuationHeader != null && (
+        <div className="rp-continuation-header">{renderedContinuationHeader}</div>
+      )}
+      {isSplitLinesSlice && slice.lineRange != null ? (
+        <span
+          className="rp-line-slice-window"
+          style={{
+            display: 'block',
+            overflow: 'hidden',
+            height: slice.lineRange.clipHeight,
+            maxHeight: slice.lineRange.clipHeight,
+          }}
+        >
+          <span
+            className="rp-line-slice-inner"
+            style={{
+              display: 'block',
+              position: 'relative',
+              top: -slice.lineRange.offsetTop,
+            }}
+          >
+            {renderedChildren}
+          </span>
+        </span>
+      ) : (
+        renderedChildren
+      )}
+    </>
+  );
+
+  const rpDataProps = {
+    'data-rp-node': '',
+    'data-rp-id': nodeId,
+    'data-rp-kind': resolvedKind,
+    'data-rp-break-inside': resolvedBreakInside,
+    'data-rp-break-before': breakBefore,
+    'data-rp-break-after': breakAfter ?? (keepWithNext ? 'avoid' : undefined),
+    'data-rp-keep-with-next': keepWithNext ? 'true' : undefined,
+    'data-rp-orphans': orphans,
+    'data-rp-widows': widows,
+    'data-rp-box-decoration-break': boxDecorationBreak,
+    'data-rp-display': display ? 'visible' : 'none',
+    'data-rp-fragment': fragmentValue.position,
+    'data-rp-fragment-index': fragmentValue.index,
+    'data-rp-fragment-count': fragmentValue.count,
+  };
+
+  const isIntrinsicTag = typeof Component === 'string';
+  const Tag = Component as React.ElementType;
+
   return (
     <BlockPathContext.Provider
       value={{
         parentId: nodeId,
-        passId: ownPassIdRef.current,
         childCounter,
       }}
     >
       <FragmentContext.Provider value={fragmentValue}>
-        <Component
-          ref={forwardedRef}
-          data-rp-node=""
-          data-rp-id={nodeId}
-          data-rp-kind={resolvedKind}
-          data-rp-break-inside={resolvedBreakInside}
-          data-rp-break-before={breakBefore}
-          data-rp-break-after={breakAfter ?? (keepWithNext ? 'avoid' : undefined)}
-          data-rp-keep-with-next={keepWithNext ? 'true' : undefined}
-          data-rp-orphans={orphans}
-          data-rp-widows={widows}
-          data-rp-box-decoration-break={boxDecorationBreak}
-          data-rp-display={display ? 'visible' : 'none'}
-          data-rp-fragment={fragmentValue.position}
-          data-rp-fragment-index={fragmentValue.index}
-          data-rp-fragment-count={fragmentValue.count}
-          style={computedStyle}
-          {...rest}
-        >
-          {isMeasurementPass && renderedContinuationHeader != null && (
-            <div
-              data-rp-continuation-header=""
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                visibility: 'hidden',
-                pointerEvents: 'none',
-                left: 0,
-                right: 0,
-              }}
-            >
-              {renderedContinuationHeader}
-            </div>
-          )}
-          {!isMeasurementPass && fragmentValue.isContinuation && renderedContinuationHeader != null && (
-            <div className="rp-continuation-header">{renderedContinuationHeader}</div>
-          )}
-          {isSplitLinesSlice && slice.lineRange != null ? (
-            <span
-              className="rp-line-slice-window"
-              style={{
-                display: 'block',
-                overflow: 'hidden',
-                height: slice.lineRange.clipHeight,
-                maxHeight: slice.lineRange.clipHeight,
-              }}
-            >
-              <span
-                className="rp-line-slice-inner"
-                style={{
-                  display: 'block',
-                  position: 'relative',
-                  top: -slice.lineRange.offsetTop,
-                }}
-              >
-                {renderedChildren}
-              </span>
-            </span>
-          ) : (
-            renderedChildren
-          )}
-        </Component>
+        {isIntrinsicTag ? (
+          <Tag
+            ref={forwardedRef}
+            {...rpDataProps}
+            style={computedStyle}
+            {...rest}
+          >
+            {innerBody}
+          </Tag>
+        ) : (
+          <div
+            ref={forwardedRef as React.Ref<HTMLDivElement>}
+            {...rpDataProps}
+            style={computedStyle}
+          >
+            <Tag {...rest}>{innerBody}</Tag>
+          </div>
+        )}
       </FragmentContext.Provider>
     </BlockPathContext.Provider>
   );

@@ -2,6 +2,7 @@ import React from 'react';
 import { type ColumnWidthInput, type CssLength } from '../core';
 import {
   BlockPathContext,
+  DocumentContext,
   FragmentContext,
   type FragmentContextValue,
   LegacyRegisterContext,
@@ -100,8 +101,21 @@ export interface RootProps {
   content?: 'block' | 'text';
 }
 
-export function Root({ element, content = 'text' }: RootProps): React.ReactElement | null {
-  return <LegacyNodeBridge element={element} content={content} />;
+const MemoizedElementHost = React.memo(
+  function MemoizedElementHost({ element }: { element: React.ReactNode; rootKey?: string; memoize: boolean }) {
+    return <>{element}</>;
+  },
+  (prev, next) => prev.memoize && prev.rootKey != null && prev.rootKey === next.rootKey,
+);
+
+export function Root({ element, rootKey, content = 'text' }: RootProps): React.ReactElement | null {
+  const { memoize } = React.useContext(DocumentContext);
+  return (
+    <LegacyNodeBridge
+      element={<MemoizedElementHost element={element} rootKey={rootKey} memoize={memoize} />}
+      content={content}
+    />
+  );
 }
 Root.displayName = 'ReactPaperRoot';
 
@@ -154,29 +168,29 @@ interface LegacyNodeBridgeProps {
   content: 'block' | 'text' | 'parallel';
 }
 
-function LegacyNodeBridge({ element, content }: LegacyNodeBridgeProps): React.ReactElement | null {
+function LegacyNodeBridge(rawProps: LegacyNodeBridgeProps): React.ReactElement | null {
+  const { element, content } = rawProps;
   const parentPath = React.useContext(BlockPathContext);
   const { isMeasurementPass, sliceMap } = React.useContext(PageSliceContext);
+  const tokenRef = React.useRef<object>(rawProps);
 
-  const assignedIndexRef = React.useRef<{ passId: number; index: number } | null>(null);
+  let myIndex = 0;
   if (parentPath != null) {
-    if (
-      assignedIndexRef.current == null ||
-      assignedIndexRef.current.passId !== parentPath.passId
-    ) {
-      assignedIndexRef.current = {
-        passId: parentPath.passId,
-        index: parentPath.childCounter.nextIndex++,
-      };
+    const existing = parentPath.childCounter.byToken.get(tokenRef.current);
+    if (existing != null) {
+      myIndex = existing;
+    } else {
+      myIndex = parentPath.childCounter.nextIndex++;
+      parentPath.childCounter.byToken.set(tokenRef.current, myIndex);
     }
   }
 
-  const myIndex = assignedIndexRef.current?.index ?? 0;
   const nodeId = parentPath != null ? `${parentPath.parentId}.${myIndex}` : `0.${myIndex}`;
 
-  const ownPassIdRef = React.useRef(0);
-  ownPassIdRef.current += 1;
-  const childCounter = { nextIndex: 0 };
+  const childCounter = {
+    nextIndex: 0,
+    byToken: new WeakMap<object, number>(),
+  };
 
   const slice = !isMeasurementPass && sliceMap != null ? sliceMap.get(nodeId) : undefined;
 
@@ -221,7 +235,6 @@ function LegacyNodeBridge({ element, content }: LegacyNodeBridgeProps): React.Re
     <BlockPathContext.Provider
       value={{
         parentId: nodeId,
-        passId: ownPassIdRef.current,
         childCounter,
       }}
     >
@@ -248,11 +261,12 @@ function LegacyNodeBridge({ element, content }: LegacyNodeBridgeProps): React.Re
           overflow: 'hidden',
           height: windowHeight,
           maxHeight: windowHeight,
-          marginTop: fragmentValue.isFirst ? undefined : 0,
-          marginBottom: fragmentValue.isLast ? undefined : 0,
+          marginTop: slice.marginTop,
+          marginBottom: slice.marginBottom,
         }}
       >
         <div
+          className="rp-legacy-slice-inner"
           style={{
             position: 'relative',
             top: -clipTop,

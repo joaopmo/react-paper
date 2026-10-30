@@ -69,12 +69,14 @@ export function usePageInfo(): PageInfoContextValue {
 export interface DocumentContextValue {
   document: PaginatedDocument | null;
   scale: number;
+  memoize: boolean;
   print: () => void;
 }
 
 export const DocumentContext = React.createContext<DocumentContextValue>({
   document: null,
   scale: 1,
+  memoize: false,
   print: () => {
     if (typeof window !== 'undefined') window.print();
   },
@@ -99,8 +101,10 @@ export const PageSliceContext = React.createContext<PageSliceContextValue>({
 
 export interface BlockPathContextValue {
   parentId: string;
-  passId: number;
-  childCounter: { nextIndex: number };
+  childCounter: {
+    nextIndex: number;
+    byToken: WeakMap<object, number>;
+  };
 }
 
 export const BlockPathContext = React.createContext<BlockPathContextValue | null>(null);

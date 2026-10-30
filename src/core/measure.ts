@@ -213,18 +213,21 @@ export function measureElementLines(
       }
     }
 
-    // Stretch contiguous line boxes to cover inter-line leading seamlessly so slicing never clips descenders
-    for (let i = 0; i < merged.length; i++) {
-      if (i === 0) {
-        merged[i].top = 0;
-      }
-      if (i + 1 < merged.length) {
-        const mid = merged[i + 1].top;
+    // Stretch contiguous line boxes to meet at the midpoint of inter-line leading so slicing never clips ascenders or descenders
+    if (merged.length > 0) {
+      merged[0].top = 0;
+      for (let i = 0; i + 1 < merged.length; i++) {
+        const mid = (merged[i].bottom + merged[i + 1].top) / 2;
         merged[i].bottom = mid;
-      } else if (contentHeight > merged[i].bottom) {
-        merged[i].bottom = contentHeight;
+        merged[i + 1].top = mid;
       }
-      merged[i].height = Math.max(0, merged[i].bottom - merged[i].top);
+      const lastIdx = merged.length - 1;
+      if (contentHeight > merged[lastIdx].bottom) {
+        merged[lastIdx].bottom = contentHeight;
+      }
+      for (let i = 0; i < merged.length; i++) {
+        merged[i].height = Math.max(0, merged[i].bottom - merged[i].top);
+      }
     }
 
     return merged;

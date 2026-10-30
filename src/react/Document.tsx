@@ -261,18 +261,16 @@ interface ColumnItemsRendererProps {
 function ColumnItemsRenderer({
   colIdx,
   items,
-  isMeasurementPass,
-  sliceMap,
 }: ColumnItemsRendererProps): React.ReactElement {
-  const passIdRef = React.useRef(0);
-  passIdRef.current += 1;
-  const childCounter = { nextIndex: 0 };
+  const childCounter = {
+    nextIndex: 0,
+    byToken: new WeakMap<object, number>(),
+  };
 
   return (
     <BlockPathContext.Provider
       value={{
         parentId: String(colIdx),
-        passId: passIdRef.current,
         childCounter,
       }}
     >
@@ -300,6 +298,7 @@ export function Document({
   columnGap: columnGapProp = 0,
   rowGap: rowGapProp = 0,
   virtualize = false,
+  memoize = false,
   className,
   pageClassName,
   style,
@@ -485,7 +484,7 @@ export function Document({
       const colEl = stagingColumnRefs.current[i];
       if (colEl != null) {
         ro.observe(colEl);
-        const nodes = colEl.querySelectorAll('[data-rp-node]');
+        const nodes = colEl.querySelectorAll('[data-rp-node], img');
         nodes.forEach((n) => ro.observe(n));
       }
     }
@@ -522,9 +521,10 @@ export function Document({
     () => ({
       document: paginatedDoc,
       scale: visualScale,
+      memoize,
       print: triggerPrint,
     }),
-    [paginatedDoc, visualScale, triggerPrint],
+    [paginatedDoc, visualScale, memoize, triggerPrint],
   );
 
   const stagingPageInfo: PageInfoContextValue = React.useMemo(
@@ -553,7 +553,7 @@ export function Document({
   return (
     <DocumentContext.Provider value={docContextValue}>
       <style data-rp-page-style="">
-        {`@page { size: ${pageDims.cssWidth} ${pageDims.cssHeight}; margin: 0; }`}
+        {`@page { size: ${pageDims.cssWidth} ${pageDims.cssHeight}; margin: 0; } .rp-legacy-slice-inner > [data-rp-node], .rp-legacy-slice-inner [data-rp-node] { margin-top: 0 !important; margin-bottom: 0 !important; }`}
       </style>
       <div
         ref={outerRef}
@@ -573,6 +573,7 @@ export function Document({
         <div
           className="rp-staging"
           aria-hidden="true"
+          onLoadCapture={runLayoutPass}
           style={{
             position: 'absolute',
             top: 0,
@@ -591,7 +592,7 @@ export function Document({
                 <div
                   ref={stagingFirstHeaderRef}
                   className="rp-header rp-header-first"
-                  style={{ width: innerContentWidth }}
+                  style={{ width: innerContentWidth, display: 'flow-root' }}
                 >
                   {layout.firstPageHeaders.map((h, i) => (
                     <div key={i} className={h.className} style={h.style}>
@@ -605,7 +606,7 @@ export function Document({
                 <div
                   ref={stagingRunningHeaderRef}
                   className="rp-header rp-header-running"
-                  style={{ width: innerContentWidth }}
+                  style={{ width: innerContentWidth, display: 'flow-root' }}
                 >
                   {layout.runningHeaders.map((h, i) => (
                     <div key={i} className={h.className} style={h.style}>
@@ -643,6 +644,7 @@ export function Document({
                         flexBasis: colW,
                         flexShrink: 0,
                         flexGrow: 0,
+                        overflow: 'hidden',
                         ...(col.gap != null
                           ? { display: 'flex', flexDirection: 'column', rowGap: toPx(col.gap) }
                           : {}),
@@ -664,7 +666,7 @@ export function Document({
                 <div
                   ref={stagingFooterRef}
                   className="rp-footer"
-                  style={{ width: innerContentWidth }}
+                  style={{ width: innerContentWidth, display: 'flow-root' }}
                 >
                   {layout.footers.map((f, i) => (
                     <div key={i} className={f.className} style={f.style}>
@@ -811,7 +813,10 @@ function RenderedPageSheet({
 
             {/* First-Page Header */}
             {page.pageIndex === 0 && layout.firstPageHeaders.length > 0 && (
-              <div className="rp-header rp-header-first">
+              <div
+                className="rp-header rp-header-first"
+                style={{ display: 'flow-root', flexShrink: 0, width: '100%' }}
+              >
                 {layout.firstPageHeaders.map((h, i) => (
                   <div key={i} className={h.className} style={h.style}>
                     {renderSlotContent(h.children, h.element, pageInfo)}
@@ -822,7 +827,10 @@ function RenderedPageSheet({
 
             {/* Running Header */}
             {layout.runningHeaders.length > 0 && (
-              <div className="rp-header rp-header-running">
+              <div
+                className="rp-header rp-header-running"
+                style={{ display: 'flow-root', flexShrink: 0, width: '100%' }}
+              >
                 {layout.runningHeaders.map((h, i) => (
                   <div key={i} className={h.className} style={h.style}>
                     {renderSlotContent(h.children, h.element, pageInfo)}
@@ -839,6 +847,8 @@ function RenderedPageSheet({
                 columnGap,
                 width: '100%',
                 height: page.contentHeight,
+                flexShrink: 0,
+                overflow: 'hidden',
               }}
             >
               {page.columns.map((col, colIdx) => {
@@ -860,6 +870,7 @@ function RenderedPageSheet({
                       flexShrink: 0,
                       flexGrow: 0,
                       height: '100%',
+                      overflow: 'hidden',
                       ...(colDef.gap != null
                         ? { display: 'flex', flexDirection: 'column', rowGap: toPx(colDef.gap) }
                         : {}),
@@ -879,7 +890,10 @@ function RenderedPageSheet({
 
             {/* Footer */}
             {layout.footers.length > 0 && (
-              <div className="rp-footer">
+              <div
+                className="rp-footer"
+                style={{ display: 'flow-root', flexShrink: 0, width: '100%' }}
+              >
                 {layout.footers.map((f, i) => (
                   <div key={i} className={f.className} style={f.style}>
                     {renderSlotContent(f.children, undefined, pageInfo)}

@@ -113,8 +113,8 @@ describe('core/measure', () => {
       const lines = measureElementLines(el, fakeRect, metrics);
       expect(lines).toHaveLength(2);
       expect(lines[0].top).toBe(0);
-      expect(lines[0].bottom).toBe(25);
-      expect(lines[1].top).toBe(25);
+      expect(lines[0].bottom).toBe(23);
+      expect(lines[1].top).toBe(23);
       expect(lines[1].bottom).toBe(45);
     } finally {
       document.createRange = origCreateRange;
