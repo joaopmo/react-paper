@@ -137,7 +137,8 @@ const MemoizedElementHost = React.memo(
   function MemoizedElementHost({ element }: { element: React.ReactNode; rootKey?: string; memoize: boolean }) {
     return <>{element}</>;
   },
-  (prev, next) => prev.memoize && prev.rootKey != null && prev.rootKey === next.rootKey,
+  (prev, next) =>
+    prev.memoize && next.memoize && prev.rootKey != null && prev.rootKey === next.rootKey,
 );
 
 export function Root({ element, rootKey, content = 'text' }: RootProps): React.ReactElement | null {
@@ -219,10 +220,13 @@ function LegacyNodeBridge(rawProps: LegacyNodeBridgeProps): React.ReactElement |
 
   const nodeId = parentPath != null ? `${parentPath.parentId}.${myIndex}` : `0.${myIndex}`;
 
-  const childCounter = {
-    nextIndex: 0,
-    byToken: new WeakMap<object, number>(),
-  };
+  const childCounter = React.useMemo(
+    () => ({
+      nextIndex: 0,
+      byToken: new WeakMap<object, number>(),
+    }),
+    [],
+  );
 
   const slice = !isMeasurementPass && sliceMap != null ? sliceMap.get(nodeId) : undefined;
 
@@ -241,6 +245,8 @@ function LegacyNodeBridge(rawProps: LegacyNodeBridgeProps): React.ReactElement |
     },
     [content, nodeId],
   );
+
+  const legacyRegisterValue = React.useMemo(() => ({ register }), [register]);
 
   if (!isMeasurementPass && sliceMap != null && slice == null) {
     return null;
@@ -271,7 +277,7 @@ function LegacyNodeBridge(rawProps: LegacyNodeBridgeProps): React.ReactElement |
       }}
     >
       <FragmentContext.Provider value={fragmentValue}>
-        <LegacyRegisterContext.Provider value={{ register }}>
+        <LegacyRegisterContext.Provider value={legacyRegisterValue}>
           {element}
         </LegacyRegisterContext.Provider>
       </FragmentContext.Provider>

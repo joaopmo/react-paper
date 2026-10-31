@@ -293,6 +293,33 @@ function ColumnItemsRenderer({
   );
 }
 
+function areLayoutItemsEqual(
+  prevItems: React.ReactNode[],
+  nextItems: React.ReactNode[],
+): boolean {
+  if (prevItems.length !== nextItems.length) return false;
+  for (let i = 0; i < prevItems.length; i++) {
+    const prevItem = prevItems[i];
+    const nextItem = nextItems[i];
+    if (prevItem === nextItem) continue;
+    if (!React.isValidElement(prevItem) || !React.isValidElement(nextItem)) return false;
+
+    const prevProps = prevItem.props as Record<string, any> | undefined;
+    const nextProps = nextItem.props as Record<string, any> | undefined;
+
+    if (prevProps?.rootKey != null && prevProps.rootKey === nextProps?.rootKey) {
+      continue;
+    }
+
+    if (prevProps?.id != null && prevProps.id === nextProps?.id) {
+      continue;
+    }
+
+    return false;
+  }
+  return true;
+}
+
 export function Document({
   size = 'A4',
   orientation = 'portrait',
@@ -310,7 +337,27 @@ export function Document({
   children,
 }: DocumentProps): React.ReactElement {
   const clampedPageWidth = Math.min(1, Math.max(0.1, pageWidth));
-  const layout = React.useMemo(() => extractDocumentLayout(children), [children]);
+  const prevLayoutRef = React.useRef<ExtractedLayout | null>(null);
+  const layout = React.useMemo(() => {
+    const nextLayout = extractDocumentLayout(children);
+    if (memoize && prevLayoutRef.current != null) {
+      const prev = prevLayoutRef.current;
+      if (
+        prev.columns.length === nextLayout.columns.length &&
+        prev.firstPageHeaders.length === nextLayout.firstPageHeaders.length &&
+        prev.runningHeaders.length === nextLayout.runningHeaders.length &&
+        prev.continuationHeaders.length === nextLayout.continuationHeaders.length &&
+        prev.footers.length === nextLayout.footers.length &&
+        prev.columns.every((col, idx) =>
+          areLayoutItemsEqual(col.items, nextLayout.columns[idx].items),
+        )
+      ) {
+        return prev;
+      }
+    }
+    prevLayoutRef.current = nextLayout;
+    return nextLayout;
+  }, [children, memoize]);
 
   const pageDims = React.useMemo(
     () => resolvePageSize(size, orientation),
@@ -409,6 +456,9 @@ export function Document({
 
   // Core two-phase measurement + pure pagination pass
   const runLayoutPass = React.useCallback(() => {
+    if (memoize && layout === prevLayoutRef.current && lastPaginationSignatureRef.current !== '') {
+      return;
+    }
     const firstPageHeaderHeight = measureSlotHeight(stagingFirstHeaderRef.current);
     const runningHeaderHeight = measureSlotHeight(stagingRunningHeaderRef.current);
     const continuationHeaderHeight = measureSlotHeight(stagingContinuationHeaderRef.current);
@@ -539,10 +589,10 @@ export function Document({
     () => ({
       pageIndex: 0,
       pageNumber: 1,
-      totalPages: paginatedDoc.totalPages,
+      totalPages: 1,
       isMeasurementPass: true,
     }),
-    [paginatedDoc.totalPages],
+    [],
   );
 
   const stagingSliceContext = React.useMemo(
@@ -735,7 +785,7 @@ interface RenderedPageSheetProps {
   virtualize: boolean;
 }
 
-function RenderedPageSheet({
+const RenderedPageSheet = React.memo(function RenderedPageSheet({
   page,
   totalPages,
   pageDims,
@@ -963,7 +1013,7 @@ function RenderedPageSheet({
       )}
     </div>
   );
-}
+});
 
 /**
  * Legacy v3 `<Paper>` component wrapper around `<Document>` (defaults `pageWidth` to `0.6`).

@@ -256,6 +256,21 @@ export function measureElementLines(
   return fallbackLines;
 }
 
+function findContinuationHeader(el: Element): Element | null {
+  for (let i = 0; i < el.children.length; i++) {
+    const child = el.children[i];
+    if (child.getAttribute('data-rp-continuation-header') != null) {
+      return child;
+    }
+    // Only search into non-rp-node wrappers (e.g. custom component tags)
+    if (!child.hasAttribute('data-rp-node')) {
+      const nested = findContinuationHeader(child);
+      if (nested != null) return nested;
+    }
+  }
+  return null;
+}
+
 /**
  * Measures a single DOM element (and any nested `[data-rp-node]` children) into a `PreparedNode`.
  */
@@ -307,7 +322,7 @@ export function measureDomNode(el: Element, fallbackId: string): PreparedNode {
     for (let i = 0; i < directChildNodes.length; i++) {
       children.push(measureDomNode(directChildNodes[i], `${id}.${i}`));
     }
-    const contHeaderEl = el.querySelector(':scope > [data-rp-continuation-header]');
+    const contHeaderEl = findContinuationHeader(el);
     const continuationHeaderHeight =
       contHeaderEl != null ? contHeaderEl.getBoundingClientRect().height : undefined;
 

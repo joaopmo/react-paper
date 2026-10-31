@@ -43,6 +43,16 @@ export interface BlockProps extends Omit<React.HTMLAttributes<HTMLElement>, 'chi
   children?: React.ReactNode | ((fragment: FragmentContextValue) => React.ReactNode);
 }
 
+const MEASUREMENT_CONTINUATION_FRAGMENT: FragmentContextValue = {
+  position: 'middle',
+  index: 1,
+  count: 2,
+  isFirst: false,
+  isLast: false,
+  isContinuation: true,
+  isSplit: true,
+};
+
 export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
   rawProps,
   forwardedRef,
@@ -155,7 +165,7 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
   const renderedContinuationHeader =
     continuationHeader != null
       ? typeof continuationHeader === 'function'
-        ? continuationHeader(fragmentValue)
+        ? continuationHeader(isMeasurementPass ? MEASUREMENT_CONTINUATION_FRAGMENT : fragmentValue)
         : continuationHeader
       : null;
 
@@ -180,7 +190,9 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
             right: 0,
           }}
         >
-          {renderedContinuationHeader}
+          <FragmentContext.Provider value={MEASUREMENT_CONTINUATION_FRAGMENT}>
+            {renderedContinuationHeader}
+          </FragmentContext.Provider>
         </div>
       )}
       {!isMeasurementPass && fragmentValue.isContinuation && renderedContinuationHeader != null && (

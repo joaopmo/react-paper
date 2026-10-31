@@ -1,5 +1,5 @@
 import React from 'react';
-import { Level, Node, useRegister } from '../../index';
+import { Level, Node, usePageInfo, useRegister } from '../../index';
 
 const style: React.CSSProperties = {
   lineHeight: 1.4,
@@ -11,7 +11,11 @@ let renderCount = 0;
 
 function SecondLevel() {
   const { register } = useRegister();
-  renderCount++;
+  const { isMeasurementPass } = usePageInfo();
+
+  if (!isMeasurementPass) {
+    renderCount++;
+  }
 
   return (
     <div {...register()} style={style}>
