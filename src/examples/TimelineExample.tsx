@@ -67,7 +67,7 @@ export function TimelineExample({ pageWidth = 0.7, entryCount = 12 }: TimelineEx
             borderBottom: '2px solid #1e293b',
           }}
         >
-          <h1 style={{ margin: 0, fontSize: '26px' }}>Document Layout Engine (v2)</h1>
+          <h1 style={{ margin: 0, fontSize: '26px' }}>Document Layout Engine (v4)</h1>
         </div>
       </Header>
 

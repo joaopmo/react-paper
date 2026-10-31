@@ -828,8 +828,8 @@ export function AcademicPaperExample({
                     <tr style={{ borderBottom: '1px solid #0f172a', borderTop: '1px solid #0f172a' }}>
                       <th style={{ padding: '3px', textAlign: 'left' }}>Pages</th>
                       <th style={{ padding: '3px' }}>Nodes (N)</th>
-                      <th style={{ padding: '3px' }}>v1 Latency</th>
-                      <th style={{ padding: '3px' }}>v2 Latency</th>
+                      <th style={{ padding: '3px' }}>v3 Latency</th>
+                      <th style={{ padding: '3px' }}>v4 Latency</th>
                       <th style={{ padding: '3px' }}>Speedup</th>
                     </tr>
                   </thead>

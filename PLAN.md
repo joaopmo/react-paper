@@ -1,6 +1,6 @@
-# React Paper v2 — Architecture & Rewrite Plan
+# React Paper v4 — Architecture & Rewrite Plan
 
-## 1. Diagnosis of Previous Architecture (v1)
+## 1. Diagnosis of Previous Architecture (v3)
 
 After reviewing the current codebase (`Paper.tsx`, `Paginator.tsx`, `Page.tsx`, `Level.tsx`, `getStyle.ts`), the root causes of the usability, fragility, and scalability issues come down to five architectural bottlenecks:
 
@@ -26,7 +26,7 @@ Because pagination state (`useReducer` in `Paginator.tsx`) interleaves DOM style
 
 ---
 
-## 2. Proposed Architecture for v2: Single Package, Headless Core + Thin React Client
+## 2. Proposed Architecture for v4: Single Package, Headless Core + Thin React Client
 
 We will keep **a single package (`@joaopmo/react-paper`)** with zero external runtime dependencies (only `react` and `react-dom` as peer dependencies), organized internally into a pure TypeScript headless core and a thin React client exposed via clean subpath exports:
 - `@joaopmo/react-paper` — Main entry point (React components, hooks, and re-exported core types)
@@ -52,11 +52,11 @@ Studying [`@chenglou/pretext`](https://github.com/chenglou/pretext) (specificall
   - Only the React rendering layer materializes the actual React elements for each page based on the slice descriptors.
 
 ### 3.3 Direct Dependency Flow (Eliminating Cascade Loops)
-- In v1, `Paginator.tsx` had a chain of `ResizeObserver` → `setLastChanges` → `useEffect` → `setLoading(true)` → `dispatch('resize')` → `useEffect` → `setLoading(false)`, causing multiple render passes and spinner flashes.
-- In v2, measurement and pagination run synchronously inside `useLayoutEffect` before browser paint: when content or container size changes, we batch-read the Staging DOM, run `paginateTree()`, and commit the resulting `PaginatedDocument` in a single update—eliminating loading spinners for normal edits.
+- In v3, `Paginator.tsx` had a chain of `ResizeObserver` → `setLastChanges` → `useEffect` → `setLoading(true)` → `dispatch('resize')` → `useEffect` → `setLoading(false)`, causing multiple render passes and spinner flashes.
+- In v4, measurement and pagination run synchronously inside `useLayoutEffect` before browser paint: when content or container size changes, we batch-read the Staging DOM, run `paginateTree()`, and commit the resulting `PaginatedDocument` in a single update—eliminating loading spinners for normal edits.
 
 ### 3.4 Exact Line-Box Geometry via Native DOM `Range.getClientRects()`
-- Why did v1 require every registered text element to have a strict `line-height` and zero internal padding? Because it guessed line breaks using `freeHeight - (freeHeight % lineHeight)`.
+- Why did v3 require every registered text element to have a strict `line-height` and zero internal padding? Because it guessed line breaks using `freeHeight - (freeHeight % lineHeight)`.
 - Instead of guessing from `line-height` or reimplementing a font engine in JS, our `measureLayoutTree()` phase inspects text-containing blocks using a shared DOM `Range` (`range.selectNodeContents(textNode); range.getClientRects()`).
 - The browser's own layout engine gives us the exact `[top, bottom]` vertical bounds of every wrapped line—even when a paragraph contains bold text, links, inline badges, or varying line heights!
 
@@ -64,10 +64,10 @@ Studying [`@chenglou/pretext`](https://github.com/chenglou/pretext) (specificall
 
 ## 4. Generic Document Layout & Fragmentation Primitives
 
-To keep the library a **general-purpose document layout engine** (suitable for reports, invoices, contracts, articles, and resumes alike) while still making complex visuals (like cross-page timelines, callout boxes, tables, or full-bleed sidebars) effortless to build in userland, v2 will build on **standard CSS Fragmentation Level 3 concepts**:
+To keep the library a **general-purpose document layout engine** (suitable for reports, invoices, contracts, articles, and resumes alike) while still making complex visuals (like cross-page timelines, callout boxes, tables, or full-bleed sidebars) effortless to build in userland, v4 will build on **standard CSS Fragmentation Level 3 concepts**:
 
 ### 4.1 Container Fragmentation & Fragment Metadata (`boxDecorationBreak` & `useFragment`)
-Instead of duplicating the entire `<Root>` tree on every page and shifting it with `top: -upperBound`, v2 splits **containers around their allocated children**:
+Instead of duplicating the entire `<Root>` tree on every page and shifting it with `top: -upperBound`, v4 splits **containers around their allocated children**:
 - If a `<Block>` (or `<Section>`) contains 6 child items, and items 1–3 fit on Page 1 while items 4–6 flow to Page 2:
   - Page 1 renders the `<Block>` wrapper containing **only** items 1–3.
   - Page 2 renders the `<Block>` wrapper containing **only** items 4–6.
@@ -95,10 +95,10 @@ Instead of hardcoding layout templates, `<Document>` provides generic page-level
 
 ## 5. Eliminating Full-Tree Duplication (Scaling to Many Pages)
 
-How v2 avoids v1's O(P × N) duplication while still supporting arbitrary React components:
+How v4 avoids v3's O(P × N) duplication while still supporting arbitrary React components:
 
 1. **Single Offscreen/Hidden Measurement Pass + Per-Page Targeted Mounting:**
-   - Leaf blocks (`breakInside="avoid"`) are **only mounted on the single page where the solver places them**. If a document has 100 blocks across 10 pages, each page mounts ~10 blocks (total 100 mounted blocks across the document, vs. 10 × 100 = 1,000 in v1).
+   - Leaf blocks (`breakInside="avoid"`) are **only mounted on the single page where the solver places them**. If a document has 100 blocks across 10 pages, each page mounts ~10 blocks (total 100 mounted blocks across the document, vs. 10 × 100 = 1,000 in v3).
 2. **Fine-Grained Splittable Text / Leaf Slicing:**
    - When a single splittable paragraph (measured via `Range.getClientRects()`) crosses a page boundary, **only that single paragraph** is rendered in a line-aligned clip window (`[startY, endY]` from the exact `Range` line rect coordinates) on the two pages it straddles—never the parent tree or sibling components.
 3. **Optional Viewport Virtualization (`virtualize` prop):**

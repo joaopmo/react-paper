@@ -51,9 +51,9 @@
   - [useDocument()](#usedocument)
   - [usePaperPrint()](#usepaperprint)
   - [CSS Stylesheets & Classes](#css-stylesheets--classes)
-- [V1 Compatibility Guide](#v1-compatibility-guide)
-  - [Running Existing V1 Code](#running-existing-v1-code)
-  - [Migrating from V1 to V2](#migrating-from-v1-to-v2)
+- [Legacy Compatibility Guide (v1 / v3)](#legacy-compatibility-guide-v1--v3)
+  - [Running Existing v1 / v3 Code](#running-existing-v1--v3-code)
+  - [Migrating to v4](#migrating-to-v4)
 - [Headless Core Engine (`@joaopmo/react-paper/core`)](#headless-core-engine-joaopmoreact-papercore)
 - [License](#license)
 
@@ -110,7 +110,7 @@ Building multi-page printable documents in web applications (resumes, invoices, 
   - Portrait and landscape orientations.
   - Interactive preview scaling (`scale="fit-width"`, `scale="auto"`, or explicit scale ratio).
   - Production-ready print styles with `@joaopmo/react-paper/css/print`.
-- **100% Backwards-Compatible**: Existing V1 code (`<Paper>`, `<Root>`, `<Level>`, `<Node>`, `useRegister()`) runs directly without changes.
+- **100% Backwards-Compatible**: Existing v1 and v3 code (`<Paper>`, `<Root>`, `<Level>`, `<Node>`, `useRegister()`) runs directly without changes in v4.
 - **Headless Core Engine**: The pure arithmetic pagination solver is decoupled from React under `@joaopmo/react-paper/core` for server-side layout and automated testing.
 
 ---
@@ -599,7 +599,7 @@ interface DocumentProps {
   rowGap?: CssLength;
   /** When true, offscreen pages virtualize inner DOM mounting. Default: false */
   virtualize?: boolean;
-  /** Legacy V1 prop: enable memoization. Default: false */
+  /** Legacy v1/v3 prop: enable memoization. Default: false */
   memoize?: boolean;
   /** Callback fired whenever pagination recalculates */
   onPaginate?: (doc: PaginatedDocument) => void;
@@ -876,14 +876,14 @@ Generated DOM classes available for custom styling:
 
 ---
 
-## V1 Compatibility Guide
+## Legacy Compatibility Guide (v1 / v3)
 
-### Running Existing V1 Code
+### Running Existing v1 / v3 Code
 
-Existing code written for React Paper V1 continues to work without modification. The legacy primitives (`<Paper>`, `<Root>`, `<Level>`, `<Node>`, `<Header>`, and `useRegister()`) are fully supported:
+Existing code written for React Paper v1 and v3 continues to work without modification in v4. The legacy primitives (`<Paper>`, `<Root>`, `<Level>`, `<Node>`, `<Header>`, and `useRegister()`) are fully supported:
 
 ```tsx
-// V1 code works out of the box in V2
+// v1 / v3 code works out of the box in v4
 import React from 'react';
 import { Paper, Column, Root, useRegister } from '@joaopmo/react-paper';
 import '@joaopmo/react-paper/css/base';
@@ -906,11 +906,11 @@ export function LegacyApp() {
 
 ---
 
-### Migrating from V1 to V2
+### Migrating to v4
 
-You can incrementally modernize your codebase to V2's cleaner declarative primitives:
+You can incrementally modernize your codebase to v4's cleaner declarative primitives:
 
-| V1 Legacy Pattern | V2 Modern Equivalent | Benefits in V2 |
+| Legacy Pattern (v1 / v3) | Modern Equivalent (v4) | Benefits in v4 |
 |---|---|---|
 | `<Paper pageWidth={0.6}>` | `<Document size="A4" scale="fit-width">` | Standard ISO & ANSI page sizes, custom units, padding controls. |
 | `<Root element={<Card />} content="block" />` | `<Block breakInside="avoid"><Card /></Block>` | Natural JSX children, no `element={}` prop wrapper. |

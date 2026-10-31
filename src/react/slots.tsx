@@ -18,9 +18,9 @@ export interface HeaderProps {
    */
   mode?: 'first' | 'all' | 'continuation';
   children?: React.ReactNode | ((page: PageInfoContextValue) => React.ReactNode);
-  /** Legacy V1 prop: React element to render inside the header */
+  /** Legacy v1/v3 prop: React element to render inside the header */
   element?: React.ReactNode;
-  /** Legacy V1 memoization key */
+  /** Legacy v1/v3 memoization key */
   rootKey?: string;
   className?: string;
   style?: React.CSSProperties;
@@ -124,7 +124,7 @@ export function Column({ width, gap, className, style, children }: ColumnProps):
 Column.displayName = 'ReactPaperColumn';
 
 // ============================================================================
-// Legacy V1 Compatibility Primitives (<Root>, <Level>, <Node>)
+// Legacy v1/v3 Compatibility Primitives (<Root>, <Level>, <Node>)
 // ============================================================================
 
 export interface RootProps {

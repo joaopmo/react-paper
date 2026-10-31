@@ -132,8 +132,8 @@ export const LegacyRegisterContext = React.createContext<LegacyRegisterContextVa
 });
 
 /**
- * Backwards-compatible V1 hook (`useRegister()`).
- * In V2, `<Block>`, `<Section>`, and `<Text>` do not require manual `useRegister()` calls.
+ * Backwards-compatible v1/v3 hook (`useRegister()`).
+ * In v4, `<Block>`, `<Section>`, and `<Text>` do not require manual `useRegister()` calls.
  */
 export function useRegister(): LegacyRegisterContextValue {
   return React.useContext(LegacyRegisterContext);

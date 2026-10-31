@@ -57,7 +57,7 @@ export interface DocumentProps {
   rowGap?: CssLength;
   /** When `true`, offscreen pages only mount their inner React tree when near the viewport (always mounts all pages when printing). */
   virtualize?: boolean;
-  /** Legacy V1 prop (no-op in V2 as layout is automatically memoized). */
+  /** Legacy v1/v3 prop (no-op in v4 as layout is automatically memoized). */
   memoize?: boolean;
   className?: string;
   pageClassName?: string;
@@ -1016,7 +1016,7 @@ const RenderedPageSheet = React.memo(function RenderedPageSheet({
 });
 
 /**
- * Legacy V1 `<Paper>` component wrapper around `<Document>` (defaults `pageWidth` to `0.6`).
+ * Legacy v1/v3 `<Paper>` component wrapper around `<Document>` (defaults `pageWidth` to `0.6`).
  */
 export interface PaperProps extends DocumentProps {
   pageWidth?: number;
