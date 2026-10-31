@@ -287,4 +287,69 @@ describe('react/Document & primitives', () => {
     expect(slice1.style.height).toBe('100px');
     expect(slice2.style.height).toBe('60px');
   });
+
+  it('memoize prop does not freeze pagination when document dimensions change', async () => {
+    function ResizableDoc({ pageHeight }: { pageHeight: number }) {
+      return (
+        <Document memoize size={{ width: 500, height: pageHeight }}>
+          <Column>
+            <Block id="card-1" data-test-height="180">Card 1</Block>
+            <Block id="card-2" data-test-height="180">Card 2</Block>
+            <Block id="card-3" data-test-height="180">Card 3</Block>
+          </Column>
+        </Document>
+      );
+    }
+
+    const { container, rerender } = render(<ResizableDoc pageHeight={400} />);
+    await waitFor(() => {
+      // 400px height holds 2 cards (360px), 3rd card on page 2 -> 2 pages
+      expect(container.querySelectorAll('.rp-page')).toHaveLength(2);
+    });
+
+    // Enlarge height to 1000px so all 3 cards fit on 1 page
+    rerender(<ResizableDoc pageHeight={1000} />);
+    await waitFor(() => {
+      expect(container.querySelectorAll('.rp-page')).toHaveLength(1);
+    });
+  });
+
+  it('supports custom React component passed to Block as and places className on the measured element', async () => {
+    function CustomCard({ children, title }: { children?: React.ReactNode; title?: string }) {
+      return (
+        <article data-testid="article-card">
+          <h2>{title}</h2>
+          <div>{children}</div>
+        </article>
+      );
+    }
+
+    const { container } = render(
+      <Document size={{ width: 500, height: 400 }}>
+        <Column>
+          <Block
+            as={CustomCard}
+            id="custom-1"
+            className="card-custom-class"
+            data-test-height="150"
+            title="Custom Title"
+          >
+            Custom Body
+          </Block>
+        </Column>
+      </Document>,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelectorAll('.rp-page')).toHaveLength(1);
+    });
+
+    const page = container.querySelector('.rp-page')!;
+    const nodeEl = page.querySelector('[data-rp-id="custom-1"]');
+    expect(nodeEl).not.toBeNull();
+    expect(nodeEl?.classList.contains('card-custom-class')).toBe(true);
+    expect(page.querySelector('[data-testid="article-card"]')).not.toBeNull();
+    expect(page.textContent).toContain('Custom Title');
+    expect(page.textContent).toContain('Custom Body');
+  });
 });

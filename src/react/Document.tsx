@@ -12,7 +12,7 @@ import {
   createPageGeometry,
   measureDomColumn,
   paginateTree,
-   readElementStyleMetrics,
+  readElementStyleMetrics,
   resolveBoxSpacing,
   resolvePageSize,
   toPx,
@@ -258,8 +258,6 @@ function renderSlotContent(
 interface ColumnItemsRendererProps {
   colIdx: number;
   items: React.ReactNode[];
-  isMeasurementPass: boolean;
-  sliceMap: Map<string, FragmentSlice> | null;
 }
 
 function ColumnItemsRenderer({
@@ -293,33 +291,6 @@ function ColumnItemsRenderer({
   );
 }
 
-function areLayoutItemsEqual(
-  prevItems: React.ReactNode[],
-  nextItems: React.ReactNode[],
-): boolean {
-  if (prevItems.length !== nextItems.length) return false;
-  for (let i = 0; i < prevItems.length; i++) {
-    const prevItem = prevItems[i];
-    const nextItem = nextItems[i];
-    if (prevItem === nextItem) continue;
-    if (!React.isValidElement(prevItem) || !React.isValidElement(nextItem)) return false;
-
-    const prevProps = prevItem.props as Record<string, any> | undefined;
-    const nextProps = nextItem.props as Record<string, any> | undefined;
-
-    if (prevProps?.rootKey != null && prevProps.rootKey === nextProps?.rootKey) {
-      continue;
-    }
-
-    if (prevProps?.id != null && prevProps.id === nextProps?.id) {
-      continue;
-    }
-
-    return false;
-  }
-  return true;
-}
-
 export function Document({
   size = 'A4',
   orientation = 'portrait',
@@ -337,27 +308,10 @@ export function Document({
   children,
 }: DocumentProps): React.ReactElement {
   const clampedPageWidth = Math.min(1, Math.max(0.1, pageWidth));
-  const prevLayoutRef = React.useRef<ExtractedLayout | null>(null);
-  const layout = React.useMemo(() => {
-    const nextLayout = extractDocumentLayout(children);
-    if (memoize && prevLayoutRef.current != null) {
-      const prev = prevLayoutRef.current;
-      if (
-        prev.columns.length === nextLayout.columns.length &&
-        prev.firstPageHeaders.length === nextLayout.firstPageHeaders.length &&
-        prev.runningHeaders.length === nextLayout.runningHeaders.length &&
-        prev.continuationHeaders.length === nextLayout.continuationHeaders.length &&
-        prev.footers.length === nextLayout.footers.length &&
-        prev.columns.every((col, idx) =>
-          areLayoutItemsEqual(col.items, nextLayout.columns[idx].items),
-        )
-      ) {
-        return prev;
-      }
-    }
-    prevLayoutRef.current = nextLayout;
-    return nextLayout;
-  }, [children, memoize]);
+  const onPaginateRef = React.useRef(onPaginate);
+  onPaginateRef.current = onPaginate;
+
+  const layout = React.useMemo(() => extractDocumentLayout(children), [children]);
 
   const pageDims = React.useMemo(
     () => resolvePageSize(size, orientation),
@@ -456,9 +410,6 @@ export function Document({
 
   // Core two-phase measurement + pure pagination pass
   const runLayoutPass = React.useCallback(() => {
-    if (memoize && layout === prevLayoutRef.current && lastPaginationSignatureRef.current !== '') {
-      return;
-    }
     const firstPageHeaderHeight = measureSlotHeight(stagingFirstHeaderRef.current);
     const runningHeaderHeight = measureSlotHeight(stagingRunningHeaderRef.current);
     const continuationHeaderHeight = measureSlotHeight(stagingContinuationHeaderRef.current);
@@ -515,13 +466,13 @@ export function Document({
     if (signature !== lastPaginationSignatureRef.current) {
       lastPaginationSignatureRef.current = signature;
       setPaginatedDoc(nextDoc);
-      onPaginate?.(nextDoc);
+      onPaginateRef.current?.(nextDoc);
     }
-  }, [baseGeometry, layout.columns, onPaginate]);
+  }, [baseGeometry, layout]);
 
   React.useLayoutEffect(() => {
     runLayoutPass();
-  });
+  }, [runLayoutPass]);
 
   // Observe dynamic resize / image load / font changes inside the staging area
   React.useEffect(() => {
@@ -726,8 +677,6 @@ export function Document({
                       <ColumnItemsRenderer
                         colIdx={colIdx}
                         items={col.items}
-                        isMeasurementPass={true}
-                        sliceMap={null}
                       />
                     </div>
                   );
@@ -976,8 +925,6 @@ const RenderedPageSheet = React.memo(function RenderedPageSheet({
                     <ColumnItemsRenderer
                       colIdx={colIdx}
                       items={colDef.items}
-                      isMeasurementPass={false}
-                      sliceMap={sliceMap}
                     />
                   </div>
                 );

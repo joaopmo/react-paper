@@ -174,4 +174,47 @@ describe('core/measure', () => {
     expect(node.height).toBe(0);
     expect(node.kind).toBe('atomic');
   });
+
+  it('sanitizes and ignores invalid data-rp-* attribute values', () => {
+    const el = document.createElement('div');
+    el.setAttribute('data-rp-node', '');
+    el.setAttribute('data-rp-id', 'test-invalid');
+    el.setAttribute('data-rp-kind', 'unsupported_mode');
+    el.setAttribute('data-rp-break-inside', 'random_string');
+    el.setAttribute('data-rp-orphans', 'not-a-number');
+    el.setAttribute('data-rp-widows', '-5');
+    el.setAttribute('data-rp-box-decoration-break', 'invalid_val');
+
+    const node = measureDomNode(el, 'fallback');
+    // Invalid kind is sanitized; defaults to atomic if no children and breakInside is avoid
+    expect(node.kind).toBe('atomic');
+    // Invalid orphans/widows fall back to default (2)
+    expect(node.breakRules.orphans).toBe(2);
+    expect(node.breakRules.widows).toBe(2);
+    expect(node.breakRules.boxDecorationBreak).toBe('slice');
+  });
+
+  it('measures continuation header height including vertical margins', () => {
+    const container = document.createElement('div');
+    container.setAttribute('data-rp-node', '');
+    container.setAttribute('data-rp-id', 'cont-section');
+
+    const contHeader = document.createElement('div');
+    contHeader.setAttribute('data-rp-continuation-header', '');
+    contHeader.style.marginTop = '10px';
+    contHeader.style.marginBottom = '5px';
+    contHeader.getBoundingClientRect = () =>
+      ({ top: 0, bottom: 25, height: 25, width: 300 }) as DOMRect;
+
+    const child = document.createElement('div');
+    child.setAttribute('data-rp-node', '');
+    child.setAttribute('data-rp-id', 'child');
+
+    container.appendChild(contHeader);
+    container.appendChild(child);
+
+    const node = measureDomNode(container, 'fallback');
+    // Height 25 + marginTop 10 + marginBottom 5 = 40px
+    expect(node.continuationHeaderHeight).toBe(40);
+  });
 });

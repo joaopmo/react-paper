@@ -134,9 +134,9 @@ function createCursorState(): ColumnCursorState {
   };
 }
 
-function advancePage(state: ColumnCursorState): void {
+function advancePage(state: ColumnCursorState, initialUsedHeight = 0): void {
   state.pageIndex += 1;
-  state.usedHeight = 0;
+  state.usedHeight = initialUsedHeight;
   while (state.pages.length <= state.pageIndex) {
     state.pages.push([]);
   }
@@ -206,6 +206,7 @@ function allocateNodeList(
   geometry: PageGeometry,
   emitSlice: (pageIndex: number, slice: FragmentSlice) => void,
   getReservedBottomOnCurrentPage: () => number,
+  getReservedTopOnNewPage: () => number,
   parentAdvance: () => void,
   onBeforePageAdvance?: () => void,
   onAfterPageAdvance?: () => void,
@@ -268,6 +269,7 @@ function allocateNodeList(
         emitSlice(pageIdx, slice);
       },
       getReservedBottomOnCurrentPage,
+      getReservedTopOnNewPage,
       advance,
     );
 
@@ -296,6 +298,7 @@ function allocateSingleNode(
   geometry: PageGeometry,
   emitSlice: (pageIndex: number, slice: FragmentSlice) => void,
   getReservedBottomOnCurrentPage: () => number,
+  getReservedTopOnNewPage: () => number,
   advance: () => void,
 ): void {
   const { breakRules } = node;
@@ -569,6 +572,8 @@ function allocateSingleNode(
       state.pageIndex > 0 && isAtTopOfPage(state),
     );
 
+    let hasEmittedAnySlice = false;
+
     let currentContainerSlice: FragmentSlice = {
       nodeId: node.id,
       kind: 'container',
@@ -592,6 +597,7 @@ function allocateSingleNode(
       const addMarginBottom = isFinalFragment ? node.marginBottom : 0;
 
       if (currentContainerSlice.children != null && currentContainerSlice.children.length > 0) {
+        hasEmittedAnySlice = true;
         const childrenUsed = state.usedHeight - usedHeightBeforeChildren;
         currentContainerSlice.chromeBottom = addBottomChrome;
         currentContainerSlice.marginBottom = addMarginBottom;
@@ -610,6 +616,37 @@ function allocateSingleNode(
     };
 
     const openContinuationOnNewPage = () => {
+      if (!hasEmittedAnySlice) {
+        // No fragment has been emitted yet: the container start was pushed to the new page.
+        // This is the first fragment, so retain opening chromeTop, recompute top spacing, and do not add continuationHeader.
+        const pageTopSpacing = computeEffectiveTopSpacing(
+          node,
+          false,
+          0,
+          parentRowGap,
+          isFlexOrGrid,
+          state.pageIndex > 0 && isAtTopOfPage(state),
+        );
+        const openingChromeTop = pageTopSpacing.gapBefore + pageTopSpacing.effMarginTop + node.chromeTop;
+        currentContainerPageIndex = state.pageIndex;
+        currentContainerSlice = {
+          nodeId: node.id,
+          kind: 'container',
+          fragmentPosition: 'single',
+          fragmentIndex: 0,
+          fragmentCount: 1,
+          allocatedHeight: openingChromeTop,
+          marginTop: pageTopSpacing.gapBefore + pageTopSpacing.effMarginTop,
+          marginBottom: 0,
+          chromeTop: node.chromeTop,
+          chromeBottom: 0,
+          children: [],
+        };
+        usedHeightBeforeChildren = state.usedHeight + openingChromeTop;
+        state.usedHeight = usedHeightBeforeChildren;
+        return;
+      }
+
       const contChromeTop =
         (breakRules.boxDecorationBreak === 'clone' ? node.chromeTop : 0) +
         (node.continuationHeaderHeight ?? 0);
@@ -643,6 +680,10 @@ function allocateSingleNode(
       () =>
         getReservedBottomOnCurrentPage() +
         (breakRules.boxDecorationBreak === 'clone' ? node.chromeBottom : 0),
+      () =>
+        getReservedTopOnNewPage() +
+        (breakRules.boxDecorationBreak === 'clone' ? node.chromeTop : 0) +
+        (node.continuationHeaderHeight ?? 0),
       advance,
       () => closeContainerOnCurrentPage(false),
       () => openContinuationOnNewPage(),
@@ -665,7 +706,15 @@ function allocateSingleNode(
     );
 
     const startPage = state.pageIndex;
+    const usedBeforeParallel = state.usedHeight;
     const startUsed = state.usedHeight + spacing.gapBefore + spacing.effMarginTop + node.chromeTop;
+
+    const getBranchTopReserved = () =>
+      getReservedTopOnNewPage() +
+      (breakRules.boxDecorationBreak === 'clone' ? node.chromeTop : 0);
+    const branchBottomReserved = () =>
+      getReservedBottomOnCurrentPage() +
+      (breakRules.boxDecorationBreak === 'clone' ? node.chromeBottom : 0);
 
     const childBranchStates: ColumnCursorState[] = children.map(() => {
       const branch = createCursorState();
@@ -694,8 +743,9 @@ function allocateSingleNode(
           }
           branch.pages[pageIdx].push(slice);
         },
-        getReservedBottomOnCurrentPage,
-        () => advancePage(branch),
+        branchBottomReserved,
+        getBranchTopReserved,
+        () => advancePage(branch, getBranchTopReserved()),
       );
     }
 
@@ -736,7 +786,7 @@ function allocateSingleNode(
         pageMarginTop + pageChromeTop + maxChildAllocated + pageChromeBottom + pageMarginBottom;
 
       if (isFirst) {
-        state.usedHeight = (p === startPage ? startUsed - spacing.gapBefore - spacing.effMarginTop - node.chromeTop : 0) + allocatedHeight;
+        state.usedHeight = usedBeforeParallel + allocatedHeight;
       } else {
         state.usedHeight += allocatedHeight;
       }
@@ -755,6 +805,34 @@ function allocateSingleNode(
         children: pageChildren,
       });
     }
+    return;
+  }
+
+  // Fallback: treat unrecognized kind as atomic node to prevent silent drops
+  {
+    const spacing = computeEffectiveTopSpacing(
+      node,
+      hasPrevOnPage,
+      prevMarginBottomOnPage,
+      parentRowGap,
+      isFlexOrGrid,
+      state.pageIndex > 0 && isAtTopOfPage(state),
+    );
+    const allocatedHeight =
+      spacing.gapBefore + spacing.effMarginTop + node.height + node.marginBottom;
+    state.usedHeight += allocatedHeight;
+    emitSlice(state.pageIndex, {
+      nodeId: node.id,
+      kind: 'atomic',
+      fragmentPosition: 'single',
+      fragmentIndex: 0,
+      fragmentCount: 1,
+      allocatedHeight,
+      marginTop: spacing.gapBefore + spacing.effMarginTop,
+      marginBottom: node.marginBottom,
+      chromeTop: node.chromeTop,
+      chromeBottom: node.chromeBottom,
+    });
   }
 }
 
@@ -840,6 +918,7 @@ export function paginateTree(
         }
         state.pages[pageIdx].push(slice);
       },
+      () => 0,
       () => 0,
       () => advancePage(state),
     );

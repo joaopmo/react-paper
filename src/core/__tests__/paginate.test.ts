@@ -360,4 +360,116 @@ describe('core/paginate', () => {
     expect(doc.totalPages).toBe(167);
     expect(elapsed).toBeLessThan(50);
   });
+
+  it('parallel inside a container with continuation header reserves header space and does not overflow continuation pages', () => {
+    const cell = (id: string): PreparedNode => ({
+      id,
+      kind: 'container',
+      height: 400,
+      marginTop: 0,
+      marginBottom: 0,
+      chromeTop: 0,
+      chromeBottom: 0,
+      rowGap: 0,
+      isFlexOrGrid: true,
+      children: [
+        makeAtomic(`${id}a`, 100),
+        makeAtomic(`${id}b`, 100),
+        makeAtomic(`${id}c`, 100),
+        makeAtomic(`${id}d`, 100),
+      ],
+      breakRules: normalizeBreakRules({ breakInside: 'auto' }),
+    });
+
+    const parallelNode: PreparedNode = {
+      id: 'par',
+      kind: 'parallel',
+      height: 400,
+      marginTop: 0,
+      marginBottom: 0,
+      chromeTop: 0,
+      chromeBottom: 0,
+      rowGap: 0,
+      children: [cell('L'), cell('R')],
+      breakRules: normalizeBreakRules({ breakInside: 'auto' }),
+    };
+
+    const section: PreparedNode = {
+      id: 'sec',
+      kind: 'container',
+      height: 400,
+      marginTop: 0,
+      marginBottom: 0,
+      chromeTop: 0,
+      chromeBottom: 0,
+      rowGap: 0,
+      isFlexOrGrid: true,
+      continuationHeaderHeight: 50,
+      children: [parallelNode],
+      breakRules: normalizeBreakRules({ breakInside: 'auto' }),
+    };
+
+    const geometry = createPageGeometry({ size: { width: 500, height: 200 } });
+    const doc = paginateTree({ columns: [[section]] }, geometry);
+
+    // Every page's usedHeight must strictly fit within its contentHeight (no overflow)
+    for (let p = 0; p < doc.pages.length; p++) {
+      const page = doc.pages[p];
+      expect(page.columns[0].usedHeight).toBeLessThanOrEqual(page.contentHeight);
+    }
+  });
+
+  it('container whose first child does not fit on page 0 opens as first fragment on page 1 without premature continuation header', () => {
+    // Lead-in item on page 0 leaves only 100px free
+    const leadIn = makeAtomic('lead', 400);
+
+    // Section with 20px chromeTop, 40px continuation header, and child of 200px
+    // Cannot start on page 0 (needs 20 + 200 = 220px, only 100px free)
+    const child1 = makeAtomic('child-1', 200);
+    const child2 = makeAtomic('child-2', 400);
+    const section = makeContainer('section', [child1, child2], {
+      chromeTop: 20,
+      chromeBottom: 15,
+      continuationHeaderHeight: 40,
+    });
+
+    const geometry = createPageGeometry({ size: { width: 500, height: 500 } });
+    const doc = paginateTree({ columns: [[leadIn, section]] }, geometry);
+
+    expect(doc.totalPages).toBe(3);
+    // Page 0: only leadIn
+    expect(doc.pages[0].columns[0].slices.map((s) => s.nodeId)).toEqual(['lead']);
+
+    // Page 1: section's first fragment starts here. Must have chromeTop = 20, fragmentPosition = 'start', and NO continuationHeader
+    const p1Section = doc.pages[1].columns[0].slices.find((s) => s.nodeId === 'section');
+    expect(p1Section).toBeDefined();
+    expect(p1Section?.fragmentPosition).toBe('start');
+    expect(p1Section?.fragmentIndex).toBe(0);
+    expect(p1Section?.chromeTop).toBe(20);
+
+    // Page 2: section's continuation fragment. Has continuation header height (40px)
+    const p2Section = doc.pages[2].columns[0].slices.find((s) => s.nodeId === 'section');
+    expect(p2Section).toBeDefined();
+    expect(p2Section?.fragmentPosition).toBe('end');
+    expect(p2Section?.fragmentIndex).toBe(1);
+    expect(p2Section?.chromeTop).toBe(40); // continuation header height applied
+  });
+
+  it('recovers gracefully from unrecognized node kind without dropping content', () => {
+    const bogusNode = {
+      id: 'bogus-1',
+      kind: 'unknown-kind' as any,
+      height: 120,
+      marginTop: 0,
+      marginBottom: 0,
+      chromeTop: 0,
+      chromeBottom: 0,
+      rowGap: 0,
+      breakRules: normalizeBreakRules({ breakInside: 'avoid' }),
+    };
+
+    const doc = paginateTree({ columns: [[bogusNode]] }, baseGeometry);
+    expect(doc.pages[0].columns[0].slices).toHaveLength(1);
+    expect(doc.pages[0].columns[0].slices[0].nodeId).toBe('bogus-1');
+  });
 });

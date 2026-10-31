@@ -128,6 +128,9 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
   if (!display) {
     computedStyle.display = 'none';
   }
+  if (isMeasurementPass && continuationHeader != null && !computedStyle.position) {
+    computedStyle.position = 'relative';
+  }
 
   if (!isMeasurementPass && slice != null) {
     if (slice.marginTop === 0) {
@@ -263,13 +266,19 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
             {innerBody}
           </Tag>
         ) : (
-          <div
-            ref={forwardedRef as React.Ref<HTMLDivElement>}
-            {...rpDataProps}
-            style={computedStyle}
-          >
-            <Tag {...rest}>{innerBody}</Tag>
-          </div>
+          (() => {
+            const { className, ...tagRest } = rest;
+            return (
+              <div
+                ref={forwardedRef as React.Ref<HTMLDivElement>}
+                {...rpDataProps}
+                className={className}
+                style={computedStyle}
+              >
+                <Tag {...tagRest}>{innerBody}</Tag>
+              </div>
+            );
+          })()
         )}
       </FragmentContext.Provider>
     </BlockPathContext.Provider>

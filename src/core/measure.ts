@@ -127,15 +127,33 @@ export function readElementBreakRules(
   cssBreakRules: Partial<BreakRules> = {},
   explicitRules?: BreakRules,
 ): BreakRules {
-  const attrBreakInside = el.getAttribute('data-rp-break-inside') as BreakInsideMode | null;
-  const attrBreakBefore = el.getAttribute('data-rp-break-before') as 'auto' | 'page' | null;
-  const attrBreakAfter = el.getAttribute('data-rp-break-after') as BreakEdgeMode | null;
+  const rawBreakInside = el.getAttribute('data-rp-break-inside');
+  const attrBreakInside: BreakInsideMode | undefined =
+    rawBreakInside === 'auto' || rawBreakInside === 'avoid' ? rawBreakInside : undefined;
+
+  const rawBreakBefore = el.getAttribute('data-rp-break-before');
+  const attrBreakBefore: ('auto' | 'page') | undefined =
+    rawBreakBefore === 'auto' || rawBreakBefore === 'page' ? rawBreakBefore : undefined;
+
+  const rawBreakAfter = el.getAttribute('data-rp-break-after');
+  const attrBreakAfter: BreakEdgeMode | undefined =
+    rawBreakAfter === 'auto' || rawBreakAfter === 'page' || rawBreakAfter === 'avoid'
+      ? rawBreakAfter
+      : undefined;
+
   const attrKeepWithNext = el.getAttribute('data-rp-keep-with-next');
-  const attrOrphans = el.getAttribute('data-rp-orphans');
-  const attrWidows = el.getAttribute('data-rp-widows');
-  const attrBoxDecorationBreak = el.getAttribute(
-    'data-rp-box-decoration-break',
-  ) as BoxDecorationBreakMode | null;
+
+  const rawOrphans = el.getAttribute('data-rp-orphans');
+  const parsedOrphans = rawOrphans != null ? Number.parseInt(rawOrphans, 10) : NaN;
+  const attrOrphans = Number.isFinite(parsedOrphans) && parsedOrphans >= 1 ? parsedOrphans : undefined;
+
+  const rawWidows = el.getAttribute('data-rp-widows');
+  const parsedWidows = rawWidows != null ? Number.parseInt(rawWidows, 10) : NaN;
+  const attrWidows = Number.isFinite(parsedWidows) && parsedWidows >= 1 ? parsedWidows : undefined;
+
+  const rawBoxDecBreak = el.getAttribute('data-rp-box-decoration-break');
+  const attrBoxDecorationBreak: BoxDecorationBreakMode | undefined =
+    rawBoxDecBreak === 'slice' || rawBoxDecBreak === 'clone' ? rawBoxDecBreak : undefined;
 
   return {
     ...cssBreakRules,
@@ -145,8 +163,8 @@ export function readElementBreakRules(
     ...(attrKeepWithNext != null
       ? { keepWithNext: attrKeepWithNext === '' || attrKeepWithNext === 'true' }
       : {}),
-    ...(attrOrphans != null ? { orphans: Number.parseInt(attrOrphans, 10) } : {}),
-    ...(attrWidows != null ? { widows: Number.parseInt(attrWidows, 10) } : {}),
+    ...(attrOrphans != null ? { orphans: attrOrphans } : {}),
+    ...(attrWidows != null ? { widows: attrWidows } : {}),
     ...(attrBoxDecorationBreak != null ? { boxDecorationBreak: attrBoxDecorationBreak } : {}),
     ...explicitRules,
   };
@@ -302,7 +320,11 @@ export function measureDomNode(el: Element, fallbackId: string): PreparedNode {
   const rawBreakRules = readElementBreakRules(el, metrics.cssBreakRules);
   const breakRules = normalizeBreakRules(rawBreakRules);
 
-  const explicitKind = el.getAttribute('data-rp-kind') as PreparedNodeKind | null;
+  const rawKind = el.getAttribute('data-rp-kind');
+  const explicitKind: PreparedNodeKind | null =
+    rawKind === 'atomic' || rawKind === 'container' || rawKind === 'lines' || rawKind === 'parallel'
+      ? rawKind
+      : null;
   const directChildNodes = findDirectChildNodes(el);
 
   let kind: PreparedNodeKind;
@@ -323,8 +345,12 @@ export function measureDomNode(el: Element, fallbackId: string): PreparedNode {
       children.push(measureDomNode(directChildNodes[i], `${id}.${i}`));
     }
     const contHeaderEl = findContinuationHeader(el);
-    const continuationHeaderHeight =
-      contHeaderEl != null ? contHeaderEl.getBoundingClientRect().height : undefined;
+    let continuationHeaderHeight: number | undefined;
+    if (contHeaderEl != null) {
+      const hRect = contHeaderEl.getBoundingClientRect();
+      const hMetrics = readElementStyleMetrics(contHeaderEl);
+      continuationHeaderHeight = hRect.height + hMetrics.marginTop + hMetrics.marginBottom;
+    }
 
     return {
       id,
