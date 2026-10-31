@@ -2,7 +2,6 @@ import React from 'react';
 import { AcademicPaperExample } from './AcademicPaperExample';
 import { CreativePortfolioExample } from './CreativePortfolioExample';
 import { ExecutiveReportExample } from './ExecutiveReportExample';
-import { MemoizationLegacy } from './MemoizationLegacy';
 import { ResumeExample } from './ResumeExample';
 import { TimelineExample } from './TimelineExample';
 
@@ -49,13 +48,6 @@ export const EXAMPLES: Record<string, ExampleDefinition> = {
     description: 'Multi-page timeline with keepWithNext headings and continuation header.',
     component: TimelineExample,
     defaultProps: { pageWidth: 0.7, entryCount: 12 },
-  },
-  memoization: {
-    id: 'memoization',
-    title: 'Memoization & React State',
-    description: 'Demonstrates reactivity and memoization with incrementing state.',
-    component: MemoizationLegacy,
-    defaultProps: { pageWidth: 0.5, memoize: true },
   },
 };
 

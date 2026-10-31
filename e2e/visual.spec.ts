@@ -12,7 +12,6 @@ test.describe('Visual Regression Tests', () => {
     { id: 'executive-report', name: 'Executive & Financial Corporate Report' },
     { id: 'academic', name: 'Academic Conference Research Paper' },
     { id: 'timeline', name: 'Project Timeline' },
-    { id: 'memoization', name: 'Memoization & React State' },
   ];
 
   for (const fixture of fixtures) {
@@ -34,23 +33,4 @@ test.describe('Visual Regression Tests', () => {
       });
     });
   }
-
-  test('interactive state updates in memoization fixture', async ({ page }) => {
-    await page.goto('/?fixture=memoization');
-    await page.waitForSelector('.rp-page', { state: 'visible' });
-
-    const increaseBtn = page.getByRole('button', { name: /increase/i });
-    await expect(increaseBtn).toBeVisible();
-
-    await increaseBtn.click();
-    await expect(page.getByText('Click Count: 1')).toBeVisible();
-
-    await increaseBtn.click();
-    await expect(page.getByText('Click Count: 2')).toBeVisible();
-
-    // Verify screenshot after user interactions
-    await expect(page).toHaveScreenshot('memoization-clicked.png', {
-      fullPage: true,
-    });
-  });
 });

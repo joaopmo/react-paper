@@ -71,7 +71,6 @@ Available live fixtures in the interactive playground:
 - **[Creative Designer & Developer Portfolio](https://joaopmo.github.io/react-paper/?example=portfolio)**: Multi-page portfolio with full-bleed sidebar underlay, project continuation timeline rail, and running footer.
 - **[Multi-Page Resume](https://joaopmo.github.io/react-paper/?example=resume)**: Two-page resume with sidebar underlay, continuation banners, and timeline rail.
 - **[Project Timeline](https://joaopmo.github.io/react-paper/?example=timeline)**: Multi-page timeline with `keepWithNext` headings and continuation header.
-- **[Memoization & React State Benchmark](https://joaopmo.github.io/react-paper/?example=memoization)**: Interactive state counter demonstrating sub-millisecond re-render performance and state preservation.
 
 ---
 
@@ -599,7 +598,7 @@ interface DocumentProps {
   rowGap?: CssLength;
   /** When true, offscreen pages virtualize inner DOM mounting. Default: false */
   virtualize?: boolean;
-  /** Legacy v1/v3 prop: enable memoization. Default: false */
+  /** Legacy v1/v3 prop (no-op in v4). Default: false */
   memoize?: boolean;
   /** Callback fired whenever pagination recalculates */
   onPaginate?: (doc: PaginatedDocument) => void;
