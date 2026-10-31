@@ -220,7 +220,7 @@ describe('react/Document & primitives', () => {
     expect(pages[1].querySelector('[data-testid="underlay-2"]')).not.toBeNull();
   });
 
-  it('supports legacy v3 Paper, Root, Level, Node, and useRegister API', async () => {
+  it('supports legacy V1 Paper, Root, Level, Node, and useRegister API', async () => {
     function LegacyLeaf({ label, height }: { label: string; height: number }) {
       const { register } = useRegister();
       return (
