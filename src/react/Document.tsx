@@ -78,6 +78,7 @@ interface ExtractedColumn {
 interface ExtractedLayout {
   firstPageHeaders: HeaderProps[];
   runningHeaders: HeaderProps[];
+  continuationHeaders: HeaderProps[];
   footers: FooterProps[];
   underlays: PageLayerProps[];
   overlays: PageLayerProps[];
@@ -123,6 +124,7 @@ function extractDocumentLayout(children: React.ReactNode): ExtractedLayout {
   const layout: ExtractedLayout = {
     firstPageHeaders: [],
     runningHeaders: [],
+    continuationHeaders: [],
     footers: [],
     underlays: [],
     overlays: [],
@@ -149,6 +151,8 @@ function extractDocumentLayout(children: React.ReactNode): ExtractedLayout {
         const props = child.props as HeaderProps;
         if (props.mode === 'all') {
           layout.runningHeaders.push(props);
+        } else if (props.mode === 'continuation') {
+          layout.continuationHeaders.push(props);
         } else {
           layout.firstPageHeaders.push(props);
         }
@@ -347,6 +351,7 @@ export function Document({
   const outerRef = React.useRef<HTMLDivElement | null>(null);
   const stagingFirstHeaderRef = React.useRef<HTMLDivElement | null>(null);
   const stagingRunningHeaderRef = React.useRef<HTMLDivElement | null>(null);
+  const stagingContinuationHeaderRef = React.useRef<HTMLDivElement | null>(null);
   const stagingFooterRef = React.useRef<HTMLDivElement | null>(null);
   const stagingColumnRefs = React.useRef<Array<HTMLDivElement | null>>([]);
   const lastPaginationSignatureRef = React.useRef<string>('');
@@ -406,6 +411,7 @@ export function Document({
   const runLayoutPass = React.useCallback(() => {
     const firstPageHeaderHeight = measureSlotHeight(stagingFirstHeaderRef.current);
     const runningHeaderHeight = measureSlotHeight(stagingRunningHeaderRef.current);
+    const continuationHeaderHeight = measureSlotHeight(stagingContinuationHeaderRef.current);
     const footerHeight = measureSlotHeight(stagingFooterRef.current);
 
     const measuredColumns: PreparedNode[][] = [];
@@ -432,6 +438,7 @@ export function Document({
     const fullGeometry = {
       ...baseGeometry,
       firstPageHeaderHeight,
+      continuationHeaderHeight,
       runningHeaderHeight,
       footerHeight,
     };
@@ -479,6 +486,7 @@ export function Document({
 
     if (stagingFirstHeaderRef.current != null) ro.observe(stagingFirstHeaderRef.current);
     if (stagingRunningHeaderRef.current != null) ro.observe(stagingRunningHeaderRef.current);
+    if (stagingContinuationHeaderRef.current != null) ro.observe(stagingContinuationHeaderRef.current);
     if (stagingFooterRef.current != null) ro.observe(stagingFooterRef.current);
     for (let i = 0; i < stagingColumnRefs.current.length; i++) {
       const colEl = stagingColumnRefs.current[i];
@@ -609,6 +617,20 @@ export function Document({
                   style={{ width: innerContentWidth, display: 'flow-root' }}
                 >
                   {layout.runningHeaders.map((h, i) => (
+                    <div key={i} className={h.className} style={h.style}>
+                      {renderSlotContent(h.children, h.element, stagingPageInfo)}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {layout.continuationHeaders.length > 0 && (
+                <div
+                  ref={stagingContinuationHeaderRef}
+                  className="rp-header rp-header-continuation"
+                  style={{ width: innerContentWidth, display: 'flow-root' }}
+                >
+                  {layout.continuationHeaders.map((h, i) => (
                     <div key={i} className={h.className} style={h.style}>
                       {renderSlotContent(h.children, h.element, stagingPageInfo)}
                     </div>
@@ -776,6 +798,15 @@ function RenderedPageSheet({
   const marginRight = pageDims.width * visualScale - pageDims.width;
   const marginBottom = pageDims.height * visualScale - pageDims.height;
 
+  const pageColVars: Record<string, string> = {};
+  let accumulatedLeft = padding.left;
+  for (let c = 0; c < page.columns.length; c++) {
+    const w = page.columns[c].width;
+    pageColVars[`--rp-col-${c}-width`] = `${w}px`;
+    pageColVars[`--rp-col-${c}-left`] = `${accumulatedLeft}px`;
+    accumulatedLeft += w + columnGap;
+  }
+
   return (
     <div
       ref={pageRef}
@@ -785,6 +816,7 @@ function RenderedPageSheet({
       data-rp-page-index={page.pageIndex}
       data-rp-page-number={page.pageNumber}
       style={{
+        ...pageColVars,
         width: pageDims.width,
         height: pageDims.height,
         paddingTop: padding.top,
@@ -795,7 +827,7 @@ function RenderedPageSheet({
         marginRight,
         marginBottom,
         position: 'relative',
-      }}
+      } as React.CSSProperties}
     >
       {isVisible && (
         <PageInfoContext.Provider value={pageInfo}>
@@ -832,6 +864,20 @@ function RenderedPageSheet({
                 style={{ display: 'flow-root', flexShrink: 0, width: '100%' }}
               >
                 {layout.runningHeaders.map((h, i) => (
+                  <div key={i} className={h.className} style={h.style}>
+                    {renderSlotContent(h.children, h.element, pageInfo)}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Continuation Header (pages >= 2) */}
+            {page.pageIndex > 0 && layout.continuationHeaders.length > 0 && (
+              <div
+                className="rp-header rp-header-continuation"
+                style={{ display: 'flow-root', flexShrink: 0, width: '100%' }}
+              >
+                {layout.continuationHeaders.map((h, i) => (
                   <div key={i} className={h.className} style={h.style}>
                     {renderSlotContent(h.children, h.element, pageInfo)}
                   </div>

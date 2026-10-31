@@ -1,5 +1,8 @@
 import React from 'react';
+import { AcademicPaperExample } from './AcademicPaperExample';
+import { CreativePortfolioExample } from './CreativePortfolioExample';
 import { DoubleColumnLegacy } from './DoubleColumnLegacy';
+import { ExecutiveReportExample } from './ExecutiveReportExample';
 import { HeaderLegacy } from './HeaderLegacy';
 import { MemoizationLegacy } from './MemoizationLegacy';
 import { ResumeExample } from './ResumeExample';
@@ -15,6 +18,27 @@ export interface ExampleDefinition {
 }
 
 export const EXAMPLES: Record<string, ExampleDefinition> = {
+  portfolio: {
+    id: 'portfolio',
+    title: 'Creative Portfolio (v4)',
+    description: 'Multi-page designer & developer portfolio with full-bleed sidebar underlay, project continuation timeline rail, case study cards, and running footer.',
+    component: CreativePortfolioExample,
+    defaultProps: { pageWidth: 0.8, showPrintToolbar: true },
+  },
+  'executive-report': {
+    id: 'executive-report',
+    title: 'Executive & Financial Report (v4)',
+    description: 'Corporate executive report with KPI sidebar, multi-page financial table, continuation headers, and underlay watermark.',
+    component: ExecutiveReportExample,
+    defaultProps: { pageWidth: 0.82, showPrintToolbar: true },
+  },
+  academic: {
+    id: 'academic',
+    title: 'Academic Research Paper (v4)',
+    description: 'Two-column IEEE/ACM conference format with abstract, theorem box, algorithm, SVG figures, and continuation headers.',
+    component: AcademicPaperExample,
+    defaultProps: { pageWidth: 0.78, showPrintToolbar: true },
+  },
   resume: {
     id: 'resume',
     title: 'Multi-Page Resume (v4)',

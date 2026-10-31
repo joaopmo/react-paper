@@ -268,6 +268,7 @@ export interface CreatePageGeometryOptions {
   columnGap?: CssLength;
   rowGap?: CssLength;
   firstPageHeaderHeight?: number;
+  continuationHeaderHeight?: number;
   runningHeaderHeight?: number;
   footerHeight?: number;
 }
@@ -289,6 +290,7 @@ export function createPageGeometry(options: CreatePageGeometryOptions = {}): Pag
     columnGap,
     rowGap,
     firstPageHeaderHeight: options.firstPageHeaderHeight ?? 0,
+    continuationHeaderHeight: options.continuationHeaderHeight ?? 0,
     runningHeaderHeight: options.runningHeaderHeight ?? 0,
     footerHeight: options.footerHeight ?? 0,
   };

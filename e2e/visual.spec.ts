@@ -8,10 +8,10 @@ test.describe('Visual Regression Tests', () => {
 
   const fixtures = [
     { id: 'resume', name: 'Multi-Page Resume (v4)' },
+    { id: 'portfolio', name: 'Creative Designer & Developer Portfolio (v4)' },
+    { id: 'executive-report', name: 'Executive & Financial Corporate Report (v4)' },
+    { id: 'academic', name: 'Academic Conference Research Paper (v4)' },
     { id: 'timeline', name: 'Project Timeline (v4)' },
-    { id: 'double-column', name: 'Double Column Layout (v3 API)' },
-    { id: 'single-column', name: 'Single Column Layout (v3 API)' },
-    { id: 'header', name: 'With Header (v3 API)' },
     { id: 'memoization', name: 'Memoization & React State' },
   ];
 

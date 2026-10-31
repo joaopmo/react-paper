@@ -1,5 +1,5 @@
 import React from 'react';
-import { type ColumnWidthInput, type CssLength } from '../core';
+import { type ColumnWidthInput, type CssLength, toPx } from '../core';
 import {
   BlockPathContext,
   DocumentContext,
@@ -12,8 +12,11 @@ import {
 } from './context';
 
 export interface HeaderProps {
-  /** Whether the header appears only on the first page (`'first'`) or repeats on every page (`'all'`). Defaults to `'first'`. */
-  mode?: 'first' | 'all';
+  /**
+   * Whether the header appears only on the first page (`'first'`), repeats on every page (`'all'`),
+   * or appears strictly on continuation pages (`'continuation'`, pages >= 2). Defaults to `'first'`.
+   */
+  mode?: 'first' | 'all' | 'continuation';
   children?: React.ReactNode | ((page: PageInfoContextValue) => React.ReactNode);
   /** Legacy v3 prop: React element to render inside the header */
   element?: React.ReactNode;
@@ -68,11 +71,26 @@ export interface ColumnsProps {
   widths?: ColumnWidthInput[];
   /** Default vertical gap between items in each column */
   rowGap?: CssLength;
+  className?: string;
+  style?: React.CSSProperties;
   children?: React.ReactNode;
 }
 
-export function Columns({ children }: ColumnsProps): React.ReactElement {
-  return <>{children}</>;
+export function Columns({ gap, className, style, children }: ColumnsProps): React.ReactElement {
+  return (
+    <div
+      className={className}
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        width: '100%',
+        gap: gap != null ? toPx(gap) : undefined,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 Columns.displayName = 'ReactPaperColumns';
 
@@ -86,8 +104,22 @@ export interface ColumnProps {
   children?: React.ReactNode;
 }
 
-export function Column({ children }: ColumnProps): React.ReactElement {
-  return <>{children}</>;
+export function Column({ width, gap, className, style, children }: ColumnProps): React.ReactElement {
+  return (
+    <div
+      className={className}
+      style={{
+        flex: width != null ? (typeof width === 'number' ? `${width}px` : width) : '1 1 0px',
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: gap != null ? toPx(gap) : undefined,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 Column.displayName = 'ReactPaperColumn';
 

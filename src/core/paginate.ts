@@ -15,7 +15,9 @@ const EPSILON = 0.01;
 export function getPageContentHeight(pageIndex: number, geometry: PageGeometry): number {
   const innerHeight = geometry.height - geometry.padding.top - geometry.padding.bottom;
   const headerHeight =
-    (pageIndex === 0 ? geometry.firstPageHeaderHeight : 0) + geometry.runningHeaderHeight;
+    (pageIndex === 0
+      ? geometry.firstPageHeaderHeight
+      : (geometry.continuationHeaderHeight ?? 0)) + geometry.runningHeaderHeight;
   const footerHeight = geometry.footerHeight;
   return Math.max(1, innerHeight - headerHeight - footerHeight);
 }

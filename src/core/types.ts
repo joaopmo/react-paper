@@ -124,6 +124,8 @@ export interface PageGeometry {
   rowGap: number;
   /** Height occupied by a first-page-only header (including its bottom gap/margin) in px */
   firstPageHeaderHeight: number;
+  /** Height occupied by a continuation header on pages >= 2 in px */
+  continuationHeaderHeight?: number;
   /** Height occupied by a repeating header on every page (including its bottom gap/margin) in px */
   runningHeaderHeight: number;
   /** Height occupied by a footer on every page (including its top gap/margin) in px */
