@@ -139,6 +139,43 @@ describe('react/Document & primitives', () => {
     );
   });
 
+  it('supports Block elements inside continuationHeader without altering child block IDs or measurement', async () => {
+    const { container } = render(
+      <Document size={{ width: 500, height: 300 }}>
+        <Column>
+          <Section
+            id="sec-with-block-header"
+            continuationHeader={
+              <Block id="header-block" data-testid="nested-header-block">
+                <span>Continuation Title</span>
+              </Block>
+            }
+          >
+            <Block data-test-height="180">
+              <span data-testid="child-0">First Child</span>
+            </Block>
+            <Block data-test-height="180">
+              <span data-testid="child-1">Second Child</span>
+            </Block>
+          </Section>
+        </Column>
+      </Document>,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelectorAll('.rp-page')).toHaveLength(2);
+    });
+
+    const pages = container.querySelectorAll('.rp-page');
+    expect(pages[0].querySelector('[data-testid="child-0"]')).not.toBeNull();
+    expect(pages[0].querySelector('[data-testid="child-1"]')).toBeNull();
+    expect(pages[0].querySelector('[data-testid="nested-header-block"]')).toBeNull();
+
+    expect(pages[1].querySelector('[data-testid="child-1"]')).not.toBeNull();
+    expect(pages[1].querySelector('[data-testid="child-0"]')).toBeNull();
+    expect(pages[1].querySelector('[data-testid="nested-header-block"]')).not.toBeNull();
+  });
+
   it('keeps keepWithNext headings attached to the following block', async () => {
     const { container } = render(
       <Document size={{ width: 500, height: 300 }}>

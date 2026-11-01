@@ -313,11 +313,23 @@ export function Document({
 
   const layout = React.useMemo(() => extractDocumentLayout(children), [children]);
 
+  const sizeKey = typeof size === 'string' ? size : `${size?.width}x${size?.height}`;
   const pageDims = React.useMemo(
     () => resolvePageSize(size, orientation),
-    [size, orientation],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sizeKey, orientation],
   );
-  const resolvedPadding = React.useMemo(() => resolveBoxSpacing(padding), [padding]);
+
+  const paddingKey = Array.isArray(padding)
+    ? padding.join(',')
+    : typeof padding === 'object' && padding !== null
+      ? `${padding.top},${padding.right},${padding.bottom},${padding.left}`
+      : String(padding);
+  const resolvedPadding = React.useMemo(
+    () => resolveBoxSpacing(padding),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [paddingKey],
+  );
 
   const effectiveColumnGap = layout.columnsGap ?? columnGapProp;
   const effectiveRowGap = layout.columnsRowGap ?? rowGapProp;
@@ -326,6 +338,9 @@ export function Document({
     const perCol = layout.columns.map((c) => c.width);
     return perCol.some((w) => w != null) ? (perCol as ColumnWidthInput[]) : undefined;
   }, [layout.columns, layout.columnsWidths]);
+
+  const effectiveColumnWidthsKey = effectiveColumnWidths?.join(',') ?? '';
+  const baseGeometryKey = `${pageDims.width}x${pageDims.height}|${resolvedPadding.top},${resolvedPadding.right},${resolvedPadding.bottom},${resolvedPadding.left}|${layout.columns.length}|${effectiveColumnWidthsKey}|${effectiveColumnGap}|${effectiveRowGap}`;
 
   const baseGeometry = React.useMemo(
     () =>
@@ -338,24 +353,23 @@ export function Document({
         columnGap: effectiveColumnGap,
         rowGap: effectiveRowGap,
       }),
-    [
-      size,
-      orientation,
-      padding,
-      layout.columns.length,
-      effectiveColumnWidths,
-      effectiveColumnGap,
-      effectiveRowGap,
-    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseGeometryKey],
   );
 
   const outerRef = React.useRef<HTMLDivElement | null>(null);
+  const stagingAreaRef = React.useRef<HTMLDivElement | null>(null);
   const stagingFirstHeaderRef = React.useRef<HTMLDivElement | null>(null);
   const stagingRunningHeaderRef = React.useRef<HTMLDivElement | null>(null);
   const stagingContinuationHeaderRef = React.useRef<HTMLDivElement | null>(null);
   const stagingFooterRef = React.useRef<HTMLDivElement | null>(null);
   const stagingColumnRefs = React.useRef<Array<HTMLDivElement | null>>([]);
   const lastPaginationSignatureRef = React.useRef<string>('');
+
+  const layoutRef = React.useRef(layout);
+  layoutRef.current = layout;
+  const baseGeometryRef = React.useRef(baseGeometry);
+  baseGeometryRef.current = baseGeometry;
 
   const [visualScale, setVisualScale] = React.useState<number>(() =>
     typeof scaleProp === 'number' ? scaleProp : 1,
@@ -410,6 +424,9 @@ export function Document({
 
   // Core two-phase measurement + pure pagination pass
   const runLayoutPass = React.useCallback(() => {
+    const currentLayout = layoutRef.current;
+    const currentBaseGeometry = baseGeometryRef.current;
+
     const firstPageHeaderHeight = measureSlotHeight(stagingFirstHeaderRef.current);
     const runningHeaderHeight = measureSlotHeight(stagingRunningHeaderRef.current);
     const continuationHeaderHeight = measureSlotHeight(stagingContinuationHeaderRef.current);
@@ -419,25 +436,25 @@ export function Document({
     const columnRowGaps: number[] = [];
     const columnIsFlexOrGrid: boolean[] = [];
 
-    for (let i = 0; i < layout.columns.length; i++) {
+    for (let i = 0; i < currentLayout.columns.length; i++) {
       const colEl = stagingColumnRefs.current[i];
       if (colEl != null) {
         const res = measureDomColumn(colEl, i);
         measuredColumns.push(res.nodes);
-        const explicitColGap = layout.columns[i].gap;
+        const explicitColGap = currentLayout.columns[i].gap;
         columnRowGaps.push(
-          explicitColGap != null ? toPx(explicitColGap) : res.rowGap || baseGeometry.rowGap,
+          explicitColGap != null ? toPx(explicitColGap) : res.rowGap || currentBaseGeometry.rowGap,
         );
         columnIsFlexOrGrid.push(res.isFlexOrGrid);
       } else {
         measuredColumns.push([]);
-        columnRowGaps.push(baseGeometry.rowGap);
+        columnRowGaps.push(currentBaseGeometry.rowGap);
         columnIsFlexOrGrid.push(false);
       }
     }
 
     const fullGeometry = {
-      ...baseGeometry,
+      ...currentBaseGeometry,
       firstPageHeaderHeight,
       continuationHeaderHeight,
       runningHeaderHeight,
@@ -468,39 +485,71 @@ export function Document({
       setPaginatedDoc(nextDoc);
       onPaginateRef.current?.(nextDoc);
     }
-  }, [baseGeometry, layout]);
+  }, []);
 
   React.useLayoutEffect(() => {
     runLayoutPass();
-  }, [runLayoutPass]);
+  }, [runLayoutPass, baseGeometryKey]);
 
   // Observe dynamic resize / image load / font changes inside the staging area
   React.useEffect(() => {
-    if (typeof ResizeObserver === 'undefined') return;
+    const stagingEl = stagingAreaRef.current;
+    if (stagingEl == null) return;
+
     let rafId: number | null = null;
-    const ro = new ResizeObserver(() => {
+    const schedulePass = () => {
       if (rafId != null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         runLayoutPass();
       });
-    });
+    };
 
-    if (stagingFirstHeaderRef.current != null) ro.observe(stagingFirstHeaderRef.current);
-    if (stagingRunningHeaderRef.current != null) ro.observe(stagingRunningHeaderRef.current);
-    if (stagingContinuationHeaderRef.current != null) ro.observe(stagingContinuationHeaderRef.current);
-    if (stagingFooterRef.current != null) ro.observe(stagingFooterRef.current);
-    for (let i = 0; i < stagingColumnRefs.current.length; i++) {
-      const colEl = stagingColumnRefs.current[i];
-      if (colEl != null) {
-        ro.observe(colEl);
-        const nodes = colEl.querySelectorAll('[data-rp-node], img');
-        nodes.forEach((n) => ro.observe(n));
+    let mo: MutationObserver | null = null;
+    if (typeof MutationObserver !== 'undefined') {
+      mo = new MutationObserver(() => {
+        schedulePass();
+      });
+      mo.observe(stagingEl, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: [
+          'style',
+          'class',
+          'data-rp-node',
+          'data-rp-break-inside',
+          'data-rp-break-before',
+          'data-rp-break-after',
+        ],
+      });
+    }
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        schedulePass();
+      });
+      if (stagingFirstHeaderRef.current != null) ro.observe(stagingFirstHeaderRef.current);
+      if (stagingRunningHeaderRef.current != null) ro.observe(stagingRunningHeaderRef.current);
+      if (stagingContinuationHeaderRef.current != null) ro.observe(stagingContinuationHeaderRef.current);
+      if (stagingFooterRef.current != null) ro.observe(stagingFooterRef.current);
+      for (let i = 0; i < stagingColumnRefs.current.length; i++) {
+        const colEl = stagingColumnRefs.current[i];
+        if (colEl != null) {
+          ro.observe(colEl);
+          const nodes = colEl.querySelectorAll('[data-rp-node], img');
+          nodes.forEach((n) => {
+            ro?.observe(n);
+          });
+        }
       }
     }
 
     return () => {
       if (rafId != null) cancelAnimationFrame(rafId);
-      ro.disconnect();
+      mo?.disconnect();
+      ro?.disconnect();
     };
   }, [runLayoutPass, layout.columns.length]);
 
@@ -580,6 +629,7 @@ export function Document({
       >
         {/* Phase 1: Single-Pass Hidden Measurement Stage */}
         <div
+          ref={stagingAreaRef}
           className="rp-staging"
           aria-hidden="true"
           onLoadCapture={runLayoutPass}

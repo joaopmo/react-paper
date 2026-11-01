@@ -410,6 +410,9 @@ export function findDirectChildNodes(root: Element): Element[] {
     const children = parent.children;
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
+      if (child.hasAttribute('data-rp-continuation-header')) {
+        continue;
+      }
       if (child.hasAttribute('data-rp-node')) {
         results.push(child);
       } else {

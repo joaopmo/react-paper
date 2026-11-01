@@ -235,8 +235,9 @@ export function resolveColumnWidths(
   const result: number[] = new Array(columnCount);
 
   for (let i = 0; i < columnCount; i++) {
-    if (fixedPx[i] != null) {
-      result[i] = fixedPx[i]!;
+    const fixed = fixedPx[i];
+    if (fixed != null) {
+      result[i] = fixed;
     } else {
       result[i] = totalFr > 0 ? (frWeights[i] / totalFr) * remainingWidth : 0;
     }

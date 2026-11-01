@@ -30,6 +30,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "lint": "eslint src --ext .ts,.tsx",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

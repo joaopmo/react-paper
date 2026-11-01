@@ -115,6 +115,17 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
     };
   }, [slice?.fragmentPosition, slice?.fragmentIndex, slice?.fragmentCount]);
 
+  const headerBlockPath = React.useMemo(
+    () => ({
+      parentId: `${nodeId}:header`,
+      childCounter: {
+        nextIndex: 0,
+        byToken: new WeakMap<object, number>(),
+      },
+    }),
+    [nodeId],
+  );
+
   if (!isMeasurementPass && sliceMap != null && slice == null) {
     return null;
   }
@@ -193,17 +204,28 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
             right: 0,
           }}
         >
-          <FragmentContext.Provider value={MEASUREMENT_CONTINUATION_FRAGMENT}>
-            {renderedContinuationHeader}
-          </FragmentContext.Provider>
+          <PageSliceContext.Provider value={{ isMeasurementPass: true, sliceMap: null }}>
+            <BlockPathContext.Provider value={headerBlockPath}>
+              <FragmentContext.Provider value={MEASUREMENT_CONTINUATION_FRAGMENT}>
+                {renderedContinuationHeader}
+              </FragmentContext.Provider>
+            </BlockPathContext.Provider>
+          </PageSliceContext.Provider>
         </div>
       )}
       {!isMeasurementPass && fragmentValue.isContinuation && renderedContinuationHeader != null && (
-        <div className="rp-continuation-header">{renderedContinuationHeader}</div>
+        <div className="rp-continuation-header">
+          <PageSliceContext.Provider value={{ isMeasurementPass: false, sliceMap: null }}>
+            <BlockPathContext.Provider value={headerBlockPath}>
+              {renderedContinuationHeader}
+            </BlockPathContext.Provider>
+          </PageSliceContext.Provider>
+        </div>
       )}
       {isSplitLinesSlice && slice.lineRange != null ? (
         <span
           className="rp-line-slice-window"
+          aria-hidden={fragmentValue.isFirst ? undefined : true}
           style={{
             display: 'block',
             overflow: 'hidden',
@@ -246,7 +268,7 @@ export const Block = React.forwardRef<HTMLElement, BlockProps>(function Block(
   };
 
   const isIntrinsicTag = typeof Component === 'string';
-  const Tag = Component as React.ElementType;
+  const Tag = Component;
 
   return (
     <BlockPathContext.Provider

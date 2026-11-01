@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import { AcademicPaperExample } from './AcademicPaperExample';
 import { CreativePortfolioExample } from './CreativePortfolioExample';
 import { ExecutiveReportExample } from './ExecutiveReportExample';

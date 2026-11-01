@@ -2,7 +2,6 @@ import React from 'react';
 import { type ColumnWidthInput, type CssLength, toPx } from '../core';
 import {
   BlockPathContext,
-  DocumentContext,
   FragmentContext,
   type FragmentContextValue,
   LegacyRegisterContext,
@@ -133,19 +132,10 @@ export interface RootProps {
   content?: 'block' | 'text';
 }
 
-const MemoizedElementHost = React.memo(
-  function MemoizedElementHost({ element }: { element: React.ReactNode; rootKey?: string; memoize: boolean }) {
-    return <>{element}</>;
-  },
-  (prev, next) =>
-    prev.memoize && next.memoize && prev.rootKey != null && prev.rootKey === next.rootKey,
-);
-
-export function Root({ element, rootKey, content = 'text' }: RootProps): React.ReactElement | null {
-  const { memoize } = React.useContext(DocumentContext);
+export function Root({ element, content = 'text' }: RootProps): React.ReactElement | null {
   return (
     <LegacyNodeBridge
-      element={<MemoizedElementHost element={element} rootKey={rootKey} memoize={memoize} />}
+      element={element}
       content={content}
     />
   );

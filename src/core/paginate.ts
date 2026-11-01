@@ -123,6 +123,7 @@ function getKeepWithNextChainMinHeight(
 interface ColumnCursorState {
   pageIndex: number;
   usedHeight: number;
+  contentStart: number;
   pages: FragmentSlice[][];
 }
 
@@ -130,6 +131,7 @@ function createCursorState(): ColumnCursorState {
   return {
     pageIndex: 0,
     usedHeight: 0,
+    contentStart: 0,
     pages: [[]],
   };
 }
@@ -137,6 +139,7 @@ function createCursorState(): ColumnCursorState {
 function advancePage(state: ColumnCursorState, initialUsedHeight = 0): void {
   state.pageIndex += 1;
   state.usedHeight = initialUsedHeight;
+  state.contentStart = initialUsedHeight;
   while (state.pages.length <= state.pageIndex) {
     state.pages.push([]);
   }
@@ -148,7 +151,7 @@ function getFreeHeight(state: ColumnCursorState, geometry: PageGeometry): number
 }
 
 function isAtTopOfPage(state: ColumnCursorState): boolean {
-  return state.usedHeight <= EPSILON;
+  return state.usedHeight <= state.contentStart + EPSILON;
 }
 
 /**
@@ -218,6 +221,7 @@ function allocateNodeList(
     onBeforePageAdvance?.();
     parentAdvance();
     onAfterPageAdvance?.();
+    state.contentStart = state.usedHeight;
     hasPrevOnPage = false;
     prevMarginBottomOnPage = 0;
   };
@@ -391,8 +395,14 @@ function allocateSingleNode(
     let lineCursor = 0;
     let curHasPrev = hasPrevOnPage;
     let curPrevMarginBottom = prevMarginBottomOnPage;
+    let lastAdvancementCursor = -1;
+    let advancesAtCurrentCursor = 0;
 
     while (lineCursor < lines.length) {
+      if (lineCursor !== lastAdvancementCursor) {
+        lastAdvancementCursor = lineCursor;
+        advancesAtCurrentCursor = 0;
+      }
       const isFirstSlice = lineCursor === 0;
       const spacing = isFirstSlice
         ? computeEffectiveTopSpacing(
@@ -463,13 +473,14 @@ function allocateSingleNode(
       // Enforce orphans on the first slice
       const minOrphans = isFirstSlice ? Math.min(lines.length, breakRules.orphans) : 1;
       if (fitCount < minOrphans) {
-        if (!isAtTopOfPage(state)) {
+        if (!isAtTopOfPage(state) && advancesAtCurrentCursor === 0) {
+          advancesAtCurrentCursor += 1;
           advance();
           curHasPrev = false;
           curPrevMarginBottom = 0;
           continue;
         }
-        // At top of an empty page and even 1 line overflows: force at least 1 line to make progress
+        // At top of an empty page (or after advancing once) and even 1 line overflows: force at least 1 line to make progress
         fitCount = Math.max(1, fitCount);
         maxEndLine = Math.min(lines.length - 1, lineCursor + fitCount - 1);
       }
@@ -481,8 +492,9 @@ function allocateSingleNode(
         if (fitCount - neededBorrow >= minOrphans) {
           fitCount -= neededBorrow;
           maxEndLine = lineCursor + fitCount - 1;
-        } else if (!isAtTopOfPage(state)) {
+        } else if (!isAtTopOfPage(state) && advancesAtCurrentCursor === 0) {
           // Cannot satisfy both orphans and widows on this page; push to next page
+          advancesAtCurrentCursor += 1;
           advance();
           curHasPrev = false;
           curPrevMarginBottom = 0;
@@ -574,6 +586,7 @@ function allocateSingleNode(
 
     let hasEmittedAnySlice = false;
 
+    const isContainerAtPageTop = isAtTopOfPage(state);
     let currentContainerSlice: FragmentSlice = {
       nodeId: node.id,
       kind: 'container',
@@ -590,6 +603,9 @@ function allocateSingleNode(
     let currentContainerPageIndex = state.pageIndex;
     let usedHeightBeforeChildren = state.usedHeight + currentContainerSlice.allocatedHeight;
     state.usedHeight = usedHeightBeforeChildren;
+    if (isContainerAtPageTop) {
+      state.contentStart = state.usedHeight;
+    }
 
     const closeContainerOnCurrentPage = (isFinalFragment: boolean) => {
       const addBottomChrome =
@@ -644,6 +660,7 @@ function allocateSingleNode(
         };
         usedHeightBeforeChildren = state.usedHeight + openingChromeTop;
         state.usedHeight = usedHeightBeforeChildren;
+        state.contentStart = state.usedHeight;
         return;
       }
 
@@ -666,6 +683,7 @@ function allocateSingleNode(
       };
       usedHeightBeforeChildren = state.usedHeight + contChromeTop;
       state.usedHeight = usedHeightBeforeChildren;
+      state.contentStart = state.usedHeight;
     };
 
     allocateNodeList(
@@ -675,7 +693,7 @@ function allocateSingleNode(
       state,
       geometry,
       (_pageIdx, childSlice) => {
-        currentContainerSlice.children!.push(childSlice);
+        currentContainerSlice.children?.push(childSlice);
       },
       () =>
         getReservedBottomOnCurrentPage() +

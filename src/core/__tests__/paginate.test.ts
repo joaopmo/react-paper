@@ -472,4 +472,44 @@ describe('core/paginate', () => {
     expect(doc.pages[0].columns[0].slices).toHaveLength(1);
     expect(doc.pages[0].columns[0].slices[0].nodeId).toBe('bogus-1');
   });
+
+  it('does not infinite loop when line-splitting paragraph inside container with continuation header', () => {
+    const geometry = createPageGeometry({ size: { width: 400, height: 200 } });
+    const lh = 80;
+    const linesNode = (id: string, count: number): PreparedNode => ({
+      id,
+      kind: 'lines',
+      height: count * lh,
+      marginTop: 0,
+      marginBottom: 0,
+      chromeTop: 0,
+      chromeBottom: 0,
+      rowGap: 0,
+      lines: Array.from({ length: count }, (_, i) => ({
+        index: i,
+        top: i * lh,
+        bottom: (i + 1) * lh,
+        height: lh,
+      })),
+      breakRules: normalizeBreakRules({ orphans: 2, widows: 2 }),
+    });
+
+    const container: PreparedNode = {
+      id: 'sec',
+      kind: 'container',
+      height: 0,
+      marginTop: 0,
+      marginBottom: 0,
+      chromeTop: 0,
+      chromeBottom: 0,
+      rowGap: 0,
+      continuationHeaderHeight: 50,
+      children: [linesNode('p0', 2), linesNode('p1', 4)],
+      breakRules: normalizeBreakRules({}),
+    };
+
+    const doc = paginateTree({ columns: [[container]] }, geometry);
+    expect(doc.totalPages).toBeGreaterThan(1);
+    expect(doc.pages.length).toBe(doc.totalPages);
+  });
 });
