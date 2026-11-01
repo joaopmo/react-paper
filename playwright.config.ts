@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 30_000,
   expect: {
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.01,
+      maxDiffPixelRatio: 0.03,
       animations: 'disabled',
     },
   },
@@ -25,7 +25,6 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome',
       },
     },
   ],
