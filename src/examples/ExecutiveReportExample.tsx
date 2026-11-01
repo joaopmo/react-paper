@@ -294,7 +294,7 @@ function PrintToolbar() {
         alignItems: 'center',
         gap: '12px',
         marginBottom: '16px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: '"Inter", -apple-system, sans-serif',
       }}
     >
       <button
@@ -343,7 +343,7 @@ export function ExecutiveReportExample({
       orientation="portrait"
       padding="14mm"
       pageWidth={pageWidth}
-      style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+      style={{ fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
     >
       {showPrintToolbar && <PrintToolbar />}
 
@@ -1029,7 +1029,7 @@ export function ExecutiveReportExample({
               <span>Strictly for Apex Board of Directors &amp; Executive Leadership</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontFamily: 'monospace', fontSize: '9px', color: '#94a3b8' }}>
+              <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '9px', color: '#94a3b8' }}>
                 DOC-REF: APX-FIN-2026Q3
               </span>
               <span style={{ fontWeight: 700, color: '#0f172a' }}>

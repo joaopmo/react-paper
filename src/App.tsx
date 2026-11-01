@@ -49,7 +49,7 @@ export default function App(): React.ReactElement {
             alignItems: 'center',
             justifyContent: 'space-between',
             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontFamily: '"Inter", -apple-system, sans-serif',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

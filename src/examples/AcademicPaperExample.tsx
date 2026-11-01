@@ -45,7 +45,7 @@ function AcademicSectionRail({
         <div
           style={{
             fontSize: '9.5px',
-            fontFamily: 'serif',
+            fontFamily: '"Lora", serif',
             fontStyle: 'italic',
             fontWeight: 700,
             textTransform: 'uppercase',
@@ -74,7 +74,7 @@ function PrintToolbar() {
         justifyContent: 'center',
         gap: '12px',
         marginBottom: '16px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: '"Inter", -apple-system, sans-serif',
       }}
     >
       <button
@@ -103,7 +103,7 @@ export function AcademicPaperExample({
   showPrintToolbar = true,
 }: AcademicPaperExampleProps): React.ReactElement {
   return (
-    <div style={{ fontFamily: '"Times New Roman", Times, Cambria, Georgia, serif', color: '#111827' }}>
+    <div style={{ fontFamily: '"Lora", "Times New Roman", Times, Georgia, serif', color: '#111827' }}>
       {showPrintToolbar && <PrintToolbar />}
 
       <Document
@@ -148,7 +148,7 @@ export function AcademicPaperExample({
                 top: '7mm',
                 right: '16mm',
                 fontSize: '8.5px',
-                fontFamily: 'monospace',
+                fontFamily: '"JetBrains Mono", monospace',
                 color: '#94a3b8',
                 letterSpacing: '0.04em',
                 pointerEvents: 'none',
@@ -432,7 +432,7 @@ export function AcademicPaperExample({
                   style={{
                     textAlign: 'center',
                     margin: '6px 0',
-                    fontFamily: 'serif',
+                    fontFamily: '"Lora", serif',
                     fontSize: '11px',
                     fontWeight: 600,
                   }}
@@ -468,7 +468,7 @@ export function AcademicPaperExample({
                   Because each node participates in at most one forward chain, the cumulative lookahead evaluations across the entire document
                   is strictly bounded by 2N operations:
                 </div>
-                <div style={{ textAlign: 'center', margin: '4px 0', fontFamily: 'serif', fontWeight: 600 }}>
+                <div style={{ textAlign: 'center', margin: '4px 0', fontFamily: '"Lora", serif', fontWeight: 600 }}>
                   T(N) = ∑ [ O(1 + c_i) ] ≤ O(2N) = O(N)
                 </div>
                 <div style={{ fontSize: '9px', color: '#475569', textAlign: 'justify' }}>
@@ -504,7 +504,7 @@ export function AcademicPaperExample({
                 <div
                   style={{
                     fontSize: '9px',
-                    fontFamily: 'serif',
+                    fontFamily: '"Lora", serif',
                     fontStyle: 'italic',
                     color: '#64748b',
                     marginBottom: '6px',
@@ -653,14 +653,14 @@ export function AcademicPaperExample({
                   borderBottom: '2px solid #0f172a',
                   padding: '8px 4px',
                   background: '#fafafa',
-                  fontFamily: '"Courier New", Courier, monospace',
+                  fontFamily: '"JetBrains Mono", monospace',
                   fontSize: '9.2px',
                   lineHeight: 1.35,
                 }}
               >
                 <div
                   style={{
-                    fontFamily: '"Times New Roman", Times, serif',
+                    fontFamily: '"Lora", serif',
                     fontWeight: 700,
                     fontSize: '10px',
                     borderBottom: '1px solid #94a3b8',
@@ -712,7 +712,7 @@ export function AcademicPaperExample({
                   background: '#0f172a',
                   color: '#e2e8f0',
                   borderRadius: '3px',
-                  fontFamily: '"Courier New", Courier, monospace',
+                  fontFamily: '"JetBrains Mono", monospace',
                   fontSize: '8.8px',
                   lineHeight: 1.35,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
@@ -725,7 +725,7 @@ export function AcademicPaperExample({
                     paddingBottom: '4px',
                     marginBottom: '6px',
                     fontSize: '9px',
-                    fontFamily: 'system-ui, sans-serif',
+                    fontFamily: '"Inter", sans-serif',
                     fontWeight: 600,
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -754,7 +754,7 @@ export function AcademicPaperExample({
                 <div
                   style={{
                     fontSize: '9px',
-                    fontFamily: 'serif',
+                    fontFamily: '"Lora", serif',
                     fontStyle: 'italic',
                     color: '#64748b',
                     marginBottom: '6px',
@@ -1128,7 +1128,7 @@ export function AcademicPaperExample({
                 borderTop: '0.5px solid #cbd5e1',
                 fontSize: '8.5px',
                 color: '#64748b',
-                fontFamily: 'serif',
+                fontFamily: '"Lora", serif',
               }}
             >
               <span>IEEE Transactions on Computational Typography • Rostova et al.</span>

@@ -386,7 +386,7 @@ function PrintToolbar() {
         alignItems: 'center',
         gap: '12px',
         marginBottom: '20px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: '"Inter", -apple-system, sans-serif',
       }}
     >
       <button
@@ -434,7 +434,7 @@ export function CreativePortfolioExample({
       pageWidth={pageWidth}
       style={{
         fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+          '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
         color: '#1e293b',
       }}
     >
@@ -1524,7 +1524,7 @@ export function CreativePortfolioExample({
               alignItems: 'center',
               fontSize: '11px',
               color: '#64748b',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontFamily: '"Inter", -apple-system, sans-serif',
             }}
           >
             <div>

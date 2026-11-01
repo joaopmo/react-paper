@@ -21,7 +21,8 @@ test.describe('Visual Regression Tests', () => {
       // Wait for at least one rendered page
       await page.waitForSelector('.rp-page', { state: 'visible' });
 
-      // Ensure all web fonts are loaded
+      // Ensure network is idle and all web fonts are loaded
+      await page.waitForLoadState('networkidle');
       await page.evaluate(() => document.fonts.ready);
 
       // Brief stability pause for layout and images
